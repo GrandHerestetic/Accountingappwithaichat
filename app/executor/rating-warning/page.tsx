@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -18,57 +18,82 @@ import {
   MessageCircle,
 } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/contexts/auth-context"
+import {
+  getExecutorRating,
+  getExecutorReviews,
+  listCourses,
+  listMyCourseAssignments,
+  listMySanctions,
+} from "@/lib/api"
+import type { Course, Sanction } from "@/lib/api/types"
 
 export default function RatingWarningPage() {
-  const [timeLeft, setTimeLeft] = useState({
-    days: 6,
-    hours: 14,
-    minutes: 32,
+  const { user } = useAuth()
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0 })
+  const [executorData, setExecutorData] = useState({
+    name: "",
+    currentRating: 0,
+    previousRating: 0,
+    recentRatings: [] as number[],
+    blockEndDate: "",
+    violationsCount: 0,
+    ordersToImprove: 0,
   })
+  const [recommendedCourses, setRecommendedCourses] = useState<
+    { id: string; title: string; description: string; duration: string; price: string; rating: number; students: number; category: string }[]
+  >([])
 
-  // Mock executor data
-  const executorData = {
-    name: "Данияр Абдуллаев",
-    currentRating: 2.8,
-    previousRating: 3.4,
-    recentRatings: [2, 3, 2, 4, 1, 3, 2, 4, 3, 2],
-    blockEndDate: "2024-01-27T15:30:00",
-    violationsCount: 1,
-    ordersToImprove: 3,
-  }
-
-  const recommendedCourses = [
-    {
-      id: 1,
-      title: "Основы профессионального общения с клиентами",
-      description: "Научитесь эффективно общаться с заказчиками и избегать конфликтов",
-      duration: "4 часа",
-      price: "8000 ₸",
-      rating: 4.8,
-      students: 156,
-      category: "Коммуникации",
-    },
-    {
-      id: 2,
-      title: "Управление временем и соблюдение дедлайнов",
-      description: "Планирование работы и своевременное выполнение заказов",
-      duration: "3 часа",
-      price: "6000 ₸",
-      rating: 4.7,
-      students: 203,
-      category: "Тайм-менеджмент",
-    },
-    {
-      id: 3,
-      title: "Качество работы в бухгалтерском учете",
-      description: "Повышение качества выполняемых работ и внимание к деталям",
-      duration: "6 часов",
-      price: "12000 ₸",
-      rating: 4.9,
-      students: 89,
-      category: "Профессиональные навыки",
-    },
-  ]
+  useEffect(() => {
+    if (!user?.id) return
+    const load = async () => {
+      try {
+        const [rating, reviews, sanctions, courses, assignments] = await Promise.all([
+          getExecutorRating(user.id),
+          getExecutorReviews(user.id, { page: 1, pageSize: 10 }),
+          listMySanctions({ page: 1, pageSize: 5 }),
+          listCourses({ page: 1, pageSize: 3 }),
+          listMyCourseAssignments({ page: 1, pageSize: 10, status: "active" }),
+        ])
+        const activeSanction = sanctions.items.find((s: Sanction) => s.status === "active")
+        const ends = activeSanction?.ends_at ?? ""
+        if (ends) {
+          const diff = new Date(ends).getTime() - Date.now()
+          if (diff > 0) {
+            setTimeLeft({
+              days: Math.floor(diff / 86400000),
+              hours: Math.floor((diff % 86400000) / 3600000),
+              minutes: Math.floor((diff % 3600000) / 60000),
+            })
+          }
+        }
+        setExecutorData({
+          name: user.profile?.profile_name ?? user.email,
+          currentRating: rating.avg_rating_recent,
+          previousRating: rating.avg_rating_total,
+          recentRatings: reviews.items.map((r) => r.rating),
+          blockEndDate: ends,
+          violationsCount: sanctions.items.filter((s) => s.status === "active").length,
+          ordersToImprove: assignments.total,
+        })
+        setRecommendedCourses(
+          courses.items.map((c: Course) => ({
+            id: c.id,
+            title: c.title,
+            description: c.description ?? "",
+            duration: "—",
+            price: "—",
+            rating: 0,
+            students: 0,
+            category: c.status,
+          }))
+        )
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    load()
+  }, [user])
 
   const improvementTips = [
     {

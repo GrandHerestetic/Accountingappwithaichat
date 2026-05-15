@@ -10,65 +10,41 @@ import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/contexts/auth-context"
+import { useCoachCourses } from "@/hooks/use-swr-hooks"
 
 export default function CoachDashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const { user } = useAuth()
+  const { data: coursesData } = useCoachCourses({ page: 1, pageSize: 50 })
+  const apiCourses = coursesData?.items ?? []
 
-  // Mock data
   const coachStats = {
-    totalCourses: 8,
-    totalStudents: 234,
-    completionRate: 87,
-    totalRevenue: 450000,
-    avgRating: 4.9,
-    certificatesIssued: 156,
+    totalCourses: apiCourses.length,
+    totalStudents: 0,
+    completionRate: apiCourses.length
+      ? Math.round(
+          (apiCourses.filter((c) => c.status === "published").length / apiCourses.length) * 100
+        )
+      : 0,
+    totalRevenue: 0,
+    avgRating: 0,
+    certificatesIssued: 0,
   }
 
-  const courses = [
-    {
-      id: 1,
-      title: "Основы налогового учета в Казахстане",
-      description: "Полный курс по налоговому учету для начинающих бухгалтеров",
-      students: 89,
-      rating: 4.8,
-      status: "published",
-      lessons: 12,
-      duration: "8 часов",
-      price: "15000 ₸",
-      completionRate: 92,
-      revenue: "156000 ₸",
-      lastUpdated: "2024-01-15",
-    },
-    {
-      id: 2,
-      title: "МСФО для малого и среднего бизнеса",
-      description: "Международные стандарты финансовой отчетности",
-      students: 67,
-      rating: 4.9,
-      status: "published",
-      lessons: 15,
-      duration: "12 часов",
-      price: "25000 ₸",
-      completionRate: 85,
-      revenue: "198000 ₸",
-      lastUpdated: "2024-01-10",
-    },
-    {
-      id: 3,
-      title: "Автоматизация бухгалтерского учета",
-      description: "Работа с современными программами учета",
-      students: 45,
-      rating: 4.7,
-      status: "draft",
-      lessons: 8,
-      duration: "6 часов",
-      price: "12000 ₸",
-      completionRate: 0,
-      revenue: "0 ₸",
-      lastUpdated: "2024-01-20",
-    },
-  ]
+  const courses = apiCourses.map((c) => ({
+    id: c.id,
+    title: c.title,
+    description: c.description ?? "",
+    students: 0,
+    rating: 0,
+    status: c.status,
+    lessons: 0,
+    duration: "—",
+    price: "—",
+    completionRate: 0,
+    revenue: "—",
+    lastUpdated: c.updated_at,
+  }))
 
   const recentActivity = [
     {

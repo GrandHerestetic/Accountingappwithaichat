@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -20,83 +20,94 @@ import { Textarea } from "@/components/ui/textarea"
 import { Star, MapPin, Award, CheckCircle, MessageCircle, Phone, Mail, Globe, Edit, Save, X, Loader2 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import { apiRequest } from "@/lib/api-client"
-import type { Review, PaginatedResponse } from "@/lib/api/types"
+import { getExecutorRating, getExecutorReviews, getProfile, updateProfile } from "@/lib/api"
+import type { Review } from "@/lib/api/types"
+import { toast } from "sonner"
 
 export default function ProfilePage() {
+  const { user, refreshUser } = useAuth()
+  const [loading, setLoading] = useState(true)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [rating, setRating] = useState(0)
   const [editedProfile, setEditedProfile] = useState({
-    name: "Марат Абдуллаев",
-    title: "Сертифицированный бухгалтер",
-    location: "Алматы, Казахстан",
-    bio: "Опытный бухгалтер с 8-летним стажем работы в области налогового учета и консультирования. Специализируюсь на ведении учета для малого и среднего бизнеса, восстановлении документооборота и налоговом планировании.",
-    email: "marat.abdullaev@email.com",
-    phone: "+7 (777) 123-45-67",
-    website: "https://marat-accounting.kz",
+    name: "",
+    title: "",
+    location: "",
+    bio: "",
+    email: "",
+    phone: "",
+    website: "",
   })
 
   const profile = {
-    name: "Марат Абдуллаев",
-    title: "Сертифицированный бухгалтер",
-    location: "Алматы, Казахстан",
-    rating: 4.8,
-    reviewsCount: 45,
-    completedOrders: 89,
-    memberSince: "2022-03-15",
-    verified: true,
-    avatar: "/placeholder.svg?height=120&width=120",
-    bio: "Опытный бухгалтер с 8-летним стажем работы в области налогового учета и консультирования. Специализируюсь на ведении учета для малого и среднего бизнеса, восстановлении документооборота и налоговом планировании.",
-    specializations: [
-      "Бухгалтерский учет",
-      "Налоговое консультирование",
-      "Восстановление учета",
-      "Финансовый анализ",
-      "МСФО",
-    ],
+    name: editedProfile.name || user?.profile?.profile_name || user?.email || "",
+    title: editedProfile.title || "Специалист",
+    location: editedProfile.location || "",
+    rating: rating || 0,
+    reviewsCount: reviews.length,
+    completedOrders: 0,
+    memberSince: user?.created_at ?? "",
+    verified: user?.verification_status === "verified",
+    avatar: user?.profile?.avatar_url || "/placeholder.svg?height=120&width=120",
+    bio: editedProfile.bio,
+    specializations: [] as string[],
     achievements: [
       { title: "Топ исполнитель", description: "Рейтинг выше 4.5", icon: Star },
-      { title: "Надежный партнер", description: "50+ успешных заказов", icon: CheckCircle },
-      { title: "Быстрый отклик", description: "Ответ в течение часа", icon: MessageCircle },
+      { title: "Надежный партнер", description: "Успешные заказы", icon: CheckCircle },
+      { title: "На платформе", description: "Активный профиль", icon: MessageCircle },
     ],
     contact: {
-      email: "marat.abdullaev@email.com",
-      phone: "+7 (777) 123-45-67",
-      website: "https://marat-accounting.kz",
+      email: editedProfile.email || user?.email || "",
+      phone: editedProfile.phone,
+      website: editedProfile.website,
     },
   }
 
-  const reviews = [
-    {
-      id: 1,
-      client: "ТОО 'Алматы Строй'",
-      rating: 5,
-      comment: "Отличная работа! Марат помог восстановить весь учет за 2023 год. Все сделано качественно и в срок.",
-      date: "2024-01-20",
-      project: "Восстановление бухгалтерского учета",
-    },
-    {
-      id: 2,
-      client: "ИП Сериков А.Б.",
-      rating: 5,
-      comment: "Профессиональный подход к налоговому планированию. Рекомендую!",
-      date: "2024-01-15",
-      project: "Налоговое консультирование",
-    },
-    {
-      id: 3,
-      client: "ТОО 'Казахстан Логистик'",
-      rating: 4,
-      comment: "Хорошая работа по ведению учета. Есть небольшие замечания, но в целом доволен.",
-      date: "2024-01-10",
-      project: "Ведение бухгалтерского учета",
-    },
-  ]
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const p = await getProfile()
+        setEditedProfile({
+          name: String(p.display_name ?? p.profile_name ?? user?.profile?.profile_name ?? ""),
+          title: String(p.title ?? "Бухгалтер"),
+          location: String(p.city ?? p.location ?? ""),
+          bio: String(p.about ?? p.bio ?? ""),
+          email: user?.email ?? "",
+          phone: String(p.phone ?? ""),
+          website: String(p.website ?? ""),
+        })
+        if (user?.id && user.role === "executor") {
+          const [r, rev] = await Promise.all([
+            getExecutorRating(user.id),
+            getExecutorReviews(user.id, { page: 1, pageSize: 20 }),
+          ])
+          setRating(r.avg_rating_total)
+          setReviews(rev.items)
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    if (user) load()
+  }, [user])
 
-  const handleSaveProfile = () => {
-    // В реальном приложении здесь будет API вызов для сохранения данных
-    console.log("Saving profile:", editedProfile)
-    alert("Профиль успешно обновлен!")
-    setIsEditDialogOpen(false)
+  const handleSaveProfile = async () => {
+    try {
+      await updateProfile({
+        display_name: editedProfile.name,
+        about: editedProfile.bio,
+        phone: editedProfile.phone,
+        bio: editedProfile.bio,
+      })
+      await refreshUser()
+      toast.success("Профиль обновлён")
+      setIsEditDialogOpen(false)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Ошибка сохранения")
+    }
   }
 
   const handleInputChange = (field: string, value: string) => {
@@ -350,8 +361,8 @@ export default function ProfilePage() {
                         <div key={review.id} className="border-b pb-6 last:border-b-0">
                           <div className="flex items-start justify-between mb-3">
                             <div>
-                              <h4 className="font-medium">{review.client}</h4>
-                              <p className="text-sm text-gray-600">{review.project}</p>
+                              <h4 className="font-medium">Заказ #{review.order_id.slice(0, 8)}</h4>
+                              <p className="text-sm text-gray-600">Отзыв клиента</p>
                             </div>
                             <div className="text-right">
                               <div className="flex items-center gap-1 mb-1">
@@ -365,11 +376,13 @@ export default function ProfilePage() {
                                 ))}
                               </div>
                               <p className="text-sm text-gray-500">
-                                {new Date(review.date).toLocaleDateString("ru-RU")}
+                                {review.created_at
+                                  ? new Date(review.created_at).toLocaleDateString("ru-RU")
+                                  : ""}
                               </p>
                             </div>
                           </div>
-                          <p className="text-gray-700">{review.comment}</p>
+                          <p className="text-gray-700">{review.comment ?? ""}</p>
                         </div>
                       ))}
                     </CardContent>

@@ -10,13 +10,21 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { UserCheck, FileText, Award, Upload, CheckCircle, ArrowRight, X } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { submitExecutorLead } from "@/lib/api"
+import { FileUploadField } from "@/components/file-upload-field"
 
 export default function ExecutorRegister() {
   const [step, setStep] = useState(1)
   const [selectedSpecializations, setSelectedSpecializations] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [password, setPassword] = useState("")
+  const [documents, setDocuments] = useState({
+    identity: null as File | null,
+    education: null as File | null,
+    ipRegistration: null as File | null,
+  })
   const [formData, setFormData] = useState({
     personalInfo: {
       firstName: "",
@@ -38,7 +46,6 @@ export default function ExecutorRegister() {
     documents: [],
     agreeTerms: false,
   })
-  const { register } = useAuth()
   const router = useRouter()
 
   const specializations = [
@@ -87,32 +94,58 @@ export default function ExecutorRegister() {
   }
 
   const handleComplete = async () => {
-    // Валидация
     if (!formData.agreeTerms) {
-      alert("Необходимо согласиться с условиями использования")
+      toast.error("Необходимо согласиться с условиями использования")
       return
     }
-
     if (selectedSpecializations.length === 0) {
-      alert("Выберите хотя бы одну специализацию")
+      toast.error("Выберите хотя бы одну специализацию")
+      return
+    }
+    if (!documents.identity || !documents.education) {
+      toast.error("Загрузите удостоверение личности и документ об образовании")
+      return
+    }
+    if (!password || password.length < 8) {
+      toast.error("Пароль должен быть не менее 8 символов")
       return
     }
 
     setIsLoading(true)
-
     try {
-      await register({
-        email: formData.personalInfo.email || "executor@example.com",
-        password: "TempPass123",
-        role: "executor",
-        profile_name: `${formData.personalInfo.firstName} ${formData.personalInfo.lastName}`.trim() || "Новый исполнитель",
-      })
+      const fd = new FormData()
+      const p = formData.personalInfo
+      const pro = formData.professional
 
-      // Перенаправление в личный кабинет
-      router.push("/executor/dashboard")
+      fd.append("email", p.email)
+      fd.append("password", password)
+      fd.append("first_name", p.firstName)
+      fd.append("last_name", p.lastName)
+      if (p.middleName) fd.append("middle_name", p.middleName)
+      fd.append("iin", p.iin)
+      fd.append("phone", p.phone)
+      fd.append("city", p.city)
+      fd.append("experience_level", p.experience)
+      fd.append("education", pro.education)
+      fd.append("about", pro.description)
+      fd.append("work_format", pro.workFormat)
+      if (pro.hourlyRate) fd.append("hourly_rate", pro.hourlyRate)
+      fd.append("terms_accepted", "true")
+      for (const spec of selectedSpecializations) {
+        fd.append("specializations", spec)
+      }
+      fd.append("identity_document", documents.identity)
+      fd.append("education_document", documents.education)
+      if (documents.ipRegistration) {
+        fd.append("ip_registration_document", documents.ipRegistration)
+      }
+
+      const result = await submitExecutorLead(fd)
+      toast.success(result.message || "Заявка отправлена на модерацию")
+      router.push("/auth/login")
     } catch (error) {
       console.error("Registration error:", error)
-      alert(error instanceof Error ? error.message : "Ошибка регистрации. Попробуйте еще раз.")
+      toast.error(error instanceof Error ? error.message : "Ошибка регистрации")
     } finally {
       setIsLoading(false)
     }
@@ -250,6 +283,17 @@ export default function ExecutorRegister() {
                         personalInfo: { ...formData.personalInfo, email: e.target.value },
                       })
                     }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Пароль *</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Минимум 8 символов"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
 
@@ -424,23 +468,29 @@ export default function ExecutorRegister() {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer">
-                    <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="font-medium">Удостоверение личности</p>
-                    <p className="text-sm text-gray-600">Скан паспорта или ID карты</p>
-                  </div>
-
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer">
-                    <Award className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="font-medium">Документы об образовании</p>
-                    <p className="text-sm text-gray-600">Дипломы, сертификаты, лицензии</p>
-                  </div>
-
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer">
-                    <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="font-medium">Справка о регистрации ИП (если есть)</p>
-                    <p className="text-sm text-gray-600">Для индивидуальных предпринимателей</p>
-                  </div>
+                  <FileUploadField
+                    label="Удостоверение личности"
+                    hint="Скан паспорта или ID карты (PDF, JPG, PNG до 5MB)"
+                    value={documents.identity}
+                    onChange={(f) => setDocuments((d) => ({ ...d, identity: f }))}
+                    required
+                    disabled={isLoading}
+                  />
+                  <FileUploadField
+                    label="Документы об образовании"
+                    hint="Дипломы, сертификаты, лицензии"
+                    value={documents.education}
+                    onChange={(f) => setDocuments((d) => ({ ...d, education: f }))}
+                    required
+                    disabled={isLoading}
+                  />
+                  <FileUploadField
+                    label="Справка о регистрации ИП (если есть)"
+                    hint="Для индивидуальных предпринимателей"
+                    value={documents.ipRegistration}
+                    onChange={(f) => setDocuments((d) => ({ ...d, ipRegistration: f }))}
+                    disabled={isLoading}
+                  />
                 </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { apiRequest } from "@/lib/api-client"
+import { listMyNotifications } from "@/lib/api"
 import type { Notification, PaginatedResponse } from "@/lib/api/types"
 
 const POLL_INTERVAL_MS = 30_000
@@ -18,9 +18,11 @@ export function useNotificationsPolling() {
 
   const fetchUnread = useCallback(async () => {
     try {
-      const data = await apiRequest<PaginatedResponse<Notification>>(
-        "/api/v1/my/notifications?unread_only=true&page=1&page_size=1"
-      )
+      const data = await listMyNotifications({
+        unreadOnly: true,
+        page: 1,
+        pageSize: 1,
+      })
       setUnreadCount(data.total)
     } catch {
       // Silently ignore polling errors — badge will just stay stale

@@ -21,6 +21,7 @@ import {
 import Link from "next/link"
 import { toast } from "sonner"
 import { apiRequest } from "@/lib/api-client"
+import { uploadAndAttach } from "@/lib/api"
 import type { Order } from "@/lib/api/types"
 
 export default function ResponseToOrderPage({ params }: { params: { id: string } }) {
@@ -121,6 +122,14 @@ export default function ResponseToOrderPage({ params }: { params: { id: string }
           }),
         },
       )
+
+      if (responseData.attachments.length > 0) {
+        await uploadAndAttach(
+          responseData.attachments,
+          "response_attachment",
+          createdResponse.id
+        )
+      }
 
       // Step 2: Submit the response for payment (Req 4.4)
       const submitResult = await apiRequest<{ checkout_url?: string }>(

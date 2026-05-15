@@ -10,11 +10,16 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Building, FileText, User, ArrowRight, Upload, CheckCircle } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+import { FileUploadField } from "@/components/file-upload-field"
+import { getMe, uploadAndAttach } from "@/lib/api"
+import { toast } from "sonner"
 
 export default function ClientRegister() {
   const [clientType, setClientType] = useState("")
   const [step, setStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
+  const [password, setPassword] = useState("")
+  const [verificationDoc, setVerificationDoc] = useState<File | null>(null)
   const [formData, setFormData] = useState({
     clientType: "",
     companyName: "",
@@ -46,9 +51,20 @@ export default function ClientRegister() {
   }
 
   const handleComplete = async () => {
-    // Валидация
     if (!formData.agreeTerms) {
-      alert("Необходимо согласиться с условиями использования")
+      toast.error("Необходимо согласиться с условиями использования")
+      return
+    }
+    if (!formData.email) {
+      toast.error("Укажите email")
+      return
+    }
+    if (!password || password.length < 8) {
+      toast.error("Пароль должен быть не менее 8 символов")
+      return
+    }
+    if (!verificationDoc) {
+      toast.error("Загрузите документ для верификации")
       return
     }
 
@@ -56,17 +72,20 @@ export default function ClientRegister() {
 
     try {
       await register({
-        email: formData.email || "client@example.com",
-        password: "TempPass123",
+        email: formData.email,
+        password,
         role: "client",
         profile_name: formData.contactPerson || formData.companyName || "Новый клиент",
       })
 
-      // Перенаправление в личный кабинет
+      const me = await getMe()
+      await uploadAndAttach([verificationDoc], "profile_document", me.id)
+
+      toast.success("Регистрация завершена")
       router.push("/client/dashboard")
     } catch (error) {
       console.error("Registration error:", error)
-      alert(error instanceof Error ? error.message : "Ошибка регистрации. Попробуйте еще раз.")
+      toast.error(error instanceof Error ? error.message : "Ошибка регистрации")
     } finally {
       setIsLoading(false)
     }
@@ -232,6 +251,17 @@ export default function ClientRegister() {
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Пароль *</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Минимум 8 символов"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
               </div>
             )}
 
@@ -244,38 +274,20 @@ export default function ClientRegister() {
                   <p className="text-gray-600 mb-4">Для верификации необходимо загрузить следующие документы:</p>
                 </div>
 
-                <div className="space-y-4">
-                  {clientType === "too" && (
-                    <>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer">
-                        <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                        <p className="font-medium">Справка о государственной регистрации</p>
-                        <p className="text-sm text-gray-600">PDF, JPG, PNG до 5MB</p>
-                      </div>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer">
-                        <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                        <p className="font-medium">Справка о налоговой регистрации</p>
-                        <p className="text-sm text-gray-600">PDF, JPG, PNG до 5MB</p>
-                      </div>
-                    </>
-                  )}
-
-                  {clientType === "ip" && (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer">
-                      <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                      <p className="font-medium">Справка о регистрации ИП</p>
-                      <p className="text-sm text-gray-600">PDF, JPG, PNG до 5MB</p>
-                    </div>
-                  )}
-
-                  {clientType === "representative" && (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer">
-                      <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                      <p className="font-medium">Доверенность</p>
-                      <p className="text-sm text-gray-600">PDF, JPG, PNG до 5MB</p>
-                    </div>
-                  )}
-                </div>
+                <FileUploadField
+                  label={
+                    clientType === "too"
+                      ? "Документы регистрации"
+                      : clientType === "ip"
+                        ? "Справка о регистрации ИП"
+                        : "Доверенность"
+                  }
+                  hint="PDF, JPG, PNG до 5MB"
+                  value={verificationDoc}
+                  onChange={setVerificationDoc}
+                  required
+                  disabled={isLoading}
+                />
 
                 <div className="flex items-center space-x-2">
                   <Checkbox

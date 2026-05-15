@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -24,52 +24,61 @@ import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/contexts/auth-context"
+import { getExecutorRating, listMyResponses } from "@/lib/api"
+import type { OrderResponse } from "@/lib/api/types"
+import { Loader2 } from "lucide-react"
 
 export default function ExecutorDashboard() {
-  const [activeTab, setActiveTab] = useState("overview")
   const { user } = useAuth()
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState({
+    rating: 0,
+    activeOrders: 0,
+    completedOrders: 0,
+  })
+  const [recentResponses, setRecentResponses] = useState<OrderResponse[]>([])
 
-  // Mock data
-  const stats = {
-    rating: 4.7,
-    totalEarnings: 125000,
-    activeOrders: 2,
-    completedOrders: 18,
-    responseRate: 85,
-    profileViews: 234,
-  }
-
-  const recentOrders = [
-    {
-      id: 1,
-      title: "Ведение бухгалтерского учета для ТОО",
-      client: "ТОО 'Алматы Строй'",
-      status: "in_progress",
-      budget: "50000 ₸",
-      deadline: "2024-02-15",
-      progress: 65,
-    },
-    {
-      id: 2,
-      title: "Налоговое консультирование по НДС",
-      client: "ИП Сериков А.Б.",
-      status: "completed",
-      budget: "25000 ₸",
-      completedAt: "2024-01-20",
-      rating: 5,
-    },
-  ]
+  useEffect(() => {
+    if (!user?.id) return
+    const load = async () => {
+      try {
+        const [rating, responses] = await Promise.all([
+          getExecutorRating(user.id),
+          listMyResponses({ page: 1, pageSize: 10 }),
+        ])
+        const active = responses.items.filter((r) =>
+          ["submitted", "accepted", "payment_pending"].includes(r.status)
+        ).length
+        const completed = responses.items.filter((r) => r.status === "accepted").length
+        setStats({
+          rating: rating.avg_rating_total ?? 0,
+          activeOrders: active,
+          completedOrders: completed,
+        })
+        setRecentResponses(responses.items.slice(0, 5))
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [user?.id])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "in_progress":
-        return <Badge className="bg-yellow-100 text-yellow-800">В работе</Badge>
-      case "completed":
-        return <Badge className="bg-green-100 text-green-800">Завершен</Badge>
-      case "pending":
-        return <Badge className="bg-blue-100 text-blue-800">Ожидает</Badge>
+      case "accepted":
+        return <Badge className="bg-green-100 text-green-800">Принят</Badge>
+      case "submitted":
+        return <Badge className="bg-blue-100 text-blue-800">Отправлен</Badge>
+      case "draft":
+        return <Badge className="bg-gray-100 text-gray-800">Черновик</Badge>
+      case "rejected":
+        return <Badge className="bg-red-100 text-red-800">Отклонён</Badge>
+      case "payment_pending":
+        return <Badge className="bg-yellow-100 text-yellow-800">Оплата</Badge>
       default:
-        return <Badge variant="secondary">Неизвестно</Badge>
+        return <Badge variant="secondary">{status}</Badge>
     }
   }
 
@@ -117,8 +126,8 @@ export default function ExecutorDashboard() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Заработано</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.totalEarnings.toLocaleString()} ₸</p>
+                      <p className="text-sm font-medium text-gray-600">Откликов</p>
+                      <p className="text-2xl font-bold text-gray-900">{recentResponses.length}</p>
                     </div>
                     <div className="p-3 bg-green-100 rounded-full">
                       <DollarSign className="w-6 h-6 text-green-600" />
@@ -167,57 +176,42 @@ export default function ExecutorDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {recentOrders.map((order) => (
-                        <Card key={order.id} className="border-l-4 border-l-blue-500">
+                      {recentResponses.length === 0 && !loading && (
+                        <p className="text-center text-sm text-gray-500 py-6">Пока нет откликов</p>
+                      )}
+                      {recentResponses.map((response) => (
+                        <Card key={response.id} className="border-l-4 border-l-blue-500">
                           <CardContent className="p-4">
                             <div className="flex justify-between items-start mb-3">
                               <div className="flex-1">
-                                <h3 className="font-semibold mb-1">{order.title}</h3>
-                                <p className="text-sm text-gray-600 mb-2">Заказчик: {order.client}</p>
+                                <h3 className="font-semibold mb-1">Заказ {response.order_id.slice(0, 8)}…</h3>
+                                <p className="text-sm text-gray-600 mb-2 line-clamp-2">{response.cover_letter}</p>
                                 <div className="flex items-center gap-2">
-                                  {getStatusBadge(order.status)}
-                                  <span className="text-sm font-medium text-green-600">{order.budget}</span>
+                                  {getStatusBadge(response.status)}
+                                  <span className="text-sm font-medium text-green-600">
+                                    {response.proposed_amount.toLocaleString()} ₸
+                                  </span>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                {order.status === "in_progress" && (
-                                  <div className="mb-2">
-                                    <p className="text-xs text-gray-500 mb-1">Прогресс: {order.progress}%</p>
-                                    <Progress value={order.progress} className="w-20" />
-                                  </div>
-                                )}
-                                {order.status === "completed" && order.rating && (
-                                  <div className="flex items-center gap-1 mb-2">
-                                    <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                                    <span className="text-sm">{order.rating}</span>
-                                  </div>
-                                )}
-                                <div className="flex gap-2">
-                                  <Link href={`/chat/${order.id}`}>
-                                    <Button variant="outline" size="sm">
-                                      <MessageCircle className="w-4 h-4 mr-1" />
-                                      Чат
-                                    </Button>
-                                  </Link>
+                              <div className="flex gap-2">
+                                <Link href={`/chat/${response.order_id}`}>
+                                  <Button variant="outline" size="sm">
+                                    <MessageCircle className="w-4 h-4 mr-1" />
+                                    Чат
+                                  </Button>
+                                </Link>
+                                <Link href={`/executor/orders/${response.order_id}/response`}>
                                   <Button variant="outline" size="sm">
                                     <Eye className="w-4 h-4 mr-1" />
                                     Детали
                                   </Button>
-                                </div>
+                                </Link>
                               </div>
                             </div>
-                            {order.status === "in_progress" && (
-                              <div className="flex items-center gap-2 text-sm text-gray-600">
-                                <Calendar className="w-4 h-4" />
-                                До {new Date(order.deadline).toLocaleDateString("ru-RU")}
-                              </div>
-                            )}
-                            {order.status === "completed" && (
-                              <div className="flex items-center gap-2 text-sm text-gray-600">
-                                <CheckCircle className="w-4 h-4" />
-                                Завершен {new Date(order.completedAt!).toLocaleDateString("ru-RU")}
-                              </div>
-                            )}
+                            <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
+                              <Calendar className="w-4 h-4" />
+                              Срок: {new Date(response.proposed_deadline).toLocaleDateString("ru-RU")}
+                            </div>
                           </CardContent>
                         </Card>
                       ))}
@@ -265,12 +259,12 @@ export default function ExecutorDashboard() {
 
                     <div className="space-y-3">
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Просмотры профиля</span>
-                        <span className="font-medium">{stats.profileViews}</span>
+                        <span className="text-sm text-gray-600">Откликов всего</span>
+                        <span className="font-medium">"—"</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Скорость ответа</span>
-                        <span className="font-medium">{stats.responseRate}%</span>
+                        <span className="text-sm text-gray-600">Активных откликов</span>
+                        <span className="font-medium">{stats.activeOrders}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Успешность заказов</span>

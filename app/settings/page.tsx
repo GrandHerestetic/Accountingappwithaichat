@@ -5,282 +5,134 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
 import { PushNotificationSetup } from "@/components/push-notification-setup"
-import { User, Bell, Shield, Palette, Save, Eye, EyeOff } from "lucide-react"
-import { useState } from "react"
+import { User, Bell, Save, Loader2 } from "lucide-react"
+import { useEffect, useState } from "react"
+import { getProfile, updateProfile } from "@/lib/api"
+import { useAuth } from "@/contexts/auth-context"
+import { toast } from "sonner"
 
 export default function SettingsPage() {
-  const [showPassword, setShowPassword] = useState(false)
-  const [settings, setSettings] = useState({
-    // Профиль
-    name: "Иван Петров",
-    email: "ivan.petrov@example.com",
-    phone: "+7 (777) 123-45-67",
-
-    // Уведомления
-    emailNotifications: true,
-    pushNotifications: true,
-    smsNotifications: false,
-    chatNotifications: true,
-    orderNotifications: true,
-
-    // Приватность
-    profileVisible: true,
-    showOnlineStatus: true,
-    allowDirectMessages: true,
-
-    // Интерфейс
-    darkMode: false,
-    language: "ru",
-    compactMode: false,
+  const { user, refreshUser } = useAuth()
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({
+    display_name: "",
+    phone: "",
+    about: "",
+    company_name: "",
   })
 
-  const handleSave = () => {
-    // Здесь будет логика сохранения настроек
-    alert("Настройки сохранены!")
-  }
+  useEffect(() => {
+    getProfile()
+      .then((p) => {
+        setForm({
+          display_name: String(p.display_name ?? p.profile_name ?? user?.profile?.profile_name ?? ""),
+          phone: String(p.phone ?? ""),
+          about: String(p.about ?? p.bio ?? ""),
+          company_name: String(p.company_name ?? ""),
+        })
+      })
+      .catch(() => {
+        setForm({
+          display_name: user?.profile?.profile_name ?? "",
+          phone: String(user?.profile?.phone ?? ""),
+          about: String(user?.profile?.about ?? ""),
+          company_name: String(user?.profile?.company_name ?? ""),
+        })
+      })
+      .finally(() => setLoading(false))
+  }, [user])
 
-  const updateSetting = (key: string, value: any) => {
-    setSettings((prev) => ({ ...prev, [key]: value }))
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await updateProfile({
+        display_name: form.display_name,
+        phone: form.phone,
+        about: form.about,
+        company_name: form.company_name,
+      })
+      await refreshUser()
+      toast.success("Профиль сохранён")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Ошибка сохранения")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-
       <div className="container mx-auto px-4 py-6 max-w-4xl">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Настройки</h1>
-          <p className="text-gray-600 mt-2">Управляйте своим аккаунтом и предпочтениями</p>
-        </div>
+        <h1 className="text-3xl font-bold text-gray-900 mb-6">Настройки</h1>
 
-        <div className="space-y-6">
-          {/* Профиль */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Профиль
-              </CardTitle>
-              <CardDescription>Основная информация о вашем аккаунте</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {loading ? (
+          <Loader2 className="w-8 h-8 animate-spin" />
+        ) : (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Профиль
+                </CardTitle>
+                <CardDescription>Данные из API /api/v1/profile</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="name">Имя</Label>
-                  <Input id="name" value={settings.name} onChange={(e) => updateSetting("name", e.target.value)} />
+                  <Label>Email</Label>
+                  <Input value={user?.email ?? ""} disabled />
                 </div>
                 <div>
-                  <Label htmlFor="email">Email</Label>
+                  <Label>Имя / название</Label>
                   <Input
-                    id="email"
-                    type="email"
-                    value={settings.email}
-                    onChange={(e) => updateSetting("email", e.target.value)}
+                    value={form.display_name}
+                    onChange={(e) => setForm({ ...form, display_name: e.target.value })}
                   />
                 </div>
-              </div>
-
-              <div>
-                <Label htmlFor="phone">Телефон</Label>
-                <Input id="phone" value={settings.phone} onChange={(e) => updateSetting("phone", e.target.value)} />
-              </div>
-
-              <div>
-                <Label htmlFor="password">Новый пароль</Label>
-                <div className="relative">
+                <div>
+                  <Label>Телефон</Label>
                   <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Оставьте пустым, чтобы не менять"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Push-уведомления */}
-          <PushNotificationSetup />
-
-          {/* Уведомления */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                Уведомления
-              </CardTitle>
-              <CardDescription>Настройте, как вы хотите получать уведомления</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium">Email уведомления</p>
-                  <p className="text-sm text-gray-600">Получать уведомления на email</p>
+                  <Label>О компании</Label>
+                  <Input
+                    value={form.company_name}
+                    onChange={(e) => setForm({ ...form, company_name: e.target.value })}
+                  />
                 </div>
-                <Switch
-                  checked={settings.emailNotifications}
-                  onCheckedChange={(checked) => updateSetting("emailNotifications", checked)}
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium">SMS уведомления</p>
-                  <p className="text-sm text-gray-600">Получать SMS о важных событиях</p>
+                  <Label>О себе</Label>
+                  <Input
+                    value={form.about}
+                    onChange={(e) => setForm({ ...form, about: e.target.value })}
+                  />
                 </div>
-                <Switch
-                  checked={settings.smsNotifications}
-                  onCheckedChange={(checked) => updateSetting("smsNotifications", checked)}
-                />
-              </div>
+                <Button onClick={handleSave} disabled={saving}>
+                  {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                  Сохранить
+                </Button>
+              </CardContent>
+            </Card>
 
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Уведомления чата</p>
-                  <p className="text-sm text-gray-600">Уведомления о новых сообщениях</p>
-                </div>
-                <Switch
-                  checked={settings.chatNotifications}
-                  onCheckedChange={(checked) => updateSetting("chatNotifications", checked)}
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Уведомления о заказах</p>
-                  <p className="text-sm text-gray-600">Уведомления об изменениях в заказах</p>
-                </div>
-                <Switch
-                  checked={settings.orderNotifications}
-                  onCheckedChange={(checked) => updateSetting("orderNotifications", checked)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Приватность */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Приватность
-              </CardTitle>
-              <CardDescription>Управляйте видимостью вашего профиля</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Видимость профиля</p>
-                  <p className="text-sm text-gray-600">Показывать профиль другим пользователям</p>
-                </div>
-                <Switch
-                  checked={settings.profileVisible}
-                  onCheckedChange={(checked) => updateSetting("profileVisible", checked)}
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Статус онлайн</p>
-                  <p className="text-sm text-gray-600">Показывать когда вы в сети</p>
-                </div>
-                <Switch
-                  checked={settings.showOnlineStatus}
-                  onCheckedChange={(checked) => updateSetting("showOnlineStatus", checked)}
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Прямые сообщения</p>
-                  <p className="text-sm text-gray-600">Разрешить другим писать вам напрямую</p>
-                </div>
-                <Switch
-                  checked={settings.allowDirectMessages}
-                  onCheckedChange={(checked) => updateSetting("allowDirectMessages", checked)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Интерфейс */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="h-5 w-5" />
-                Интерфейс
-              </CardTitle>
-              <CardDescription>Настройте внешний вид приложения</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Темная тема</p>
-                  <p className="text-sm text-gray-600">Использовать темное оформление</p>
-                </div>
-                <Switch checked={settings.darkMode} onCheckedChange={(checked) => updateSetting("darkMode", checked)} />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Компактный режим</p>
-                  <p className="text-sm text-gray-600">Уменьшить отступы и размеры элементов</p>
-                </div>
-                <Switch
-                  checked={settings.compactMode}
-                  onCheckedChange={(checked) => updateSetting("compactMode", checked)}
-                />
-              </div>
-
-              <Separator />
-
-              <div>
-                <Label htmlFor="language">Язык интерфейса</Label>
-                <select
-                  id="language"
-                  className="w-full mt-1 p-2 border border-gray-300 rounded-md"
-                  value={settings.language}
-                  onChange={(e) => updateSetting("language", e.target.value)}
-                >
-                  <option value="ru">Русский</option>
-                  <option value="en">English</option>
-                  <option value="kz">Қазақша</option>
-                </select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Кнопка сохранения */}
-          <div className="flex justify-end">
-            <Button onClick={handleSave} className="flex items-center gap-2">
-              <Save className="h-4 w-4" />
-              Сохранить настройки
-            </Button>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="h-5 w-5" />
+                  Уведомления
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PushNotificationSetup />
+              </CardContent>
+            </Card>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

@@ -9,7 +9,18 @@
  */
 
 import useSWR from "swr"
-import { apiRequest } from "@/lib/api-client"
+import {
+  getMe,
+  listAdminExecutorLeads,
+  listAdminSanctions,
+  listCoachCourses,
+  listCourses,
+  listMyCourseAssignments,
+  listMyNotifications,
+  listMyOrders,
+  listMyResponses,
+  listOrders,
+} from "@/lib/api"
 import type {
   Order,
   OrderResponse,
@@ -18,10 +29,9 @@ import type {
   CourseAssignment,
   UserProfile,
   PaginatedResponse,
+  ExecutorLeadView,
+  Sanction,
 } from "@/lib/api/types"
-
-// ─── Generic fetcher ─────────────────────────────────────────────────────────
-const fetcher = <T>(url: string) => apiRequest<T>(url)
 
 // ─── Orders (public feed) ─────────────────────────────────────────────────────
 export function useOrders(params?: {
@@ -41,8 +51,16 @@ export function useOrders(params?: {
   if (params?.q) searchParams.set("q", params.q)
 
   return useSWR<PaginatedResponse<Order>>(
-    `/api/v1/orders?${searchParams.toString()}`,
-    fetcher,
+    ["orders", searchParams.toString()],
+    () =>
+      listOrders({
+        page: params?.page,
+        pageSize: params?.pageSize,
+        category: params?.category,
+        budgetMin: params?.budgetMin,
+        budgetMax: params?.budgetMax,
+        q: params?.q,
+      }),
     { revalidateOnFocus: true }
   )
 }
@@ -54,8 +72,8 @@ export function useMyOrders(params?: { page?: number; pageSize?: number }) {
   searchParams.set("page_size", String(params?.pageSize ?? 20))
 
   return useSWR<PaginatedResponse<Order>>(
-    `/api/v1/orders/my?${searchParams.toString()}`,
-    fetcher,
+    ["my-orders", searchParams.toString()],
+    () => listMyOrders({ page: params?.page, pageSize: params?.pageSize }),
     { revalidateOnFocus: true }
   )
 }
@@ -67,8 +85,8 @@ export function useMyResponses(params?: { page?: number; pageSize?: number }) {
   searchParams.set("page_size", String(params?.pageSize ?? 20))
 
   return useSWR<PaginatedResponse<OrderResponse>>(
-    `/api/v1/my/responses?${searchParams.toString()}`,
-    fetcher,
+    ["my-responses", searchParams.toString()],
+    () => listMyResponses({ page: params?.page, pageSize: params?.pageSize }),
     { revalidateOnFocus: true }
   )
 }
@@ -89,8 +107,15 @@ export function useNotifications(params?: {
   if (params?.type) searchParams.set("type", params.type)
 
   return useSWR<PaginatedResponse<Notification>>(
-    `/api/v1/my/notifications?${searchParams.toString()}`,
-    fetcher,
+    ["notifications", searchParams.toString()],
+    () =>
+      listMyNotifications({
+        page: params?.page,
+        pageSize: params?.pageSize,
+        unreadOnly: params?.unreadOnly,
+        status: params?.status,
+        type: params?.type,
+      }),
     { revalidateOnFocus: true }
   )
 }
@@ -103,8 +128,8 @@ export function useCourses(params?: { page?: number; pageSize?: number }) {
   searchParams.set("page_size", String(params?.pageSize ?? 20))
 
   return useSWR<PaginatedResponse<Course>>(
-    `/api/v1/courses?${searchParams.toString()}`,
-    fetcher,
+    ["courses", searchParams.toString()],
+    () => listCourses({ page: params?.page, pageSize: params?.pageSize }),
     {
       revalidateOnFocus: true,
       dedupingInterval: 5 * 60 * 1000,
@@ -124,8 +149,13 @@ export function useCourseAssignments(params?: {
   if (params?.status) searchParams.set("status", params.status)
 
   return useSWR<PaginatedResponse<CourseAssignment>>(
-    `/api/v1/my/course-assignments?${searchParams.toString()}`,
-    fetcher,
+    ["course-assignments", searchParams.toString()],
+    () =>
+      listMyCourseAssignments({
+        page: params?.page,
+        pageSize: params?.pageSize,
+        status: params?.status,
+      }),
     { revalidateOnFocus: true }
   )
 }
@@ -133,12 +163,29 @@ export function useCourseAssignments(params?: {
 // ─── User Profile ─────────────────────────────────────────────────────────────
 // dedupingInterval: 5 min (Req 18.1 — user profile and courses catalog)
 export function useUserProfile() {
-  return useSWR<UserProfile>(
-    "/api/v1/auth/me",
-    fetcher,
-    {
-      revalidateOnFocus: true,
-      dedupingInterval: 5 * 60 * 1000,
-    }
-  )
+  return useSWR<UserProfile>("auth-me", getMe, {
+    revalidateOnFocus: true,
+    dedupingInterval: 5 * 60 * 1000,
+  })
+}
+
+export function useCoachCourses(params?: { page?: number; pageSize?: number }) {
+  const key = `coach-courses-${params?.page ?? 1}-${params?.pageSize ?? 20}`
+  return useSWR<PaginatedResponse<Course>>(key, () => listCoachCourses(params), {
+    revalidateOnFocus: true,
+  })
+}
+
+export function useAdminExecutorLeads(params?: { page?: number; pageSize?: number; status?: string }) {
+  const key = `admin-leads-${params?.page ?? 1}-${params?.status ?? "all"}`
+  return useSWR<PaginatedResponse<ExecutorLeadView>>(key, () => listAdminExecutorLeads(params), {
+    revalidateOnFocus: true,
+  })
+}
+
+export function useAdminSanctions(params?: { page?: number; pageSize?: number }) {
+  const key = `admin-sanctions-${params?.page ?? 1}`
+  return useSWR<PaginatedResponse<Sanction>>(key, () => listAdminSanctions(params), {
+    revalidateOnFocus: true,
+  })
 }

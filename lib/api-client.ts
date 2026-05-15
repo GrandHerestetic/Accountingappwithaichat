@@ -4,7 +4,11 @@ import { ApiError, ApiErrorResponse } from "./api/types"
 // Base URL — empty string means relative URLs (same origin), which works for
 // Next.js API routes and a co-located backend. Override via env var.
 // ---------------------------------------------------------------------------
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? ""
+/** В браузере — относительные URL (Next rewrites → бэкенд). На сервере — прямой URL. */
+const API_BASE_URL =
+  typeof window !== "undefined"
+    ? ""
+    : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8082")
 
 // ---------------------------------------------------------------------------
 // Module-level access token (in-memory only — never persisted to localStorage)
@@ -52,9 +56,15 @@ export async function refreshAccessToken(): Promise<string | null> {
         return null
       }
 
-      const data = (await response.json()) as { access_token?: string }
+      const data = (await response.json()) as {
+        access_token?: string
+        refresh_token?: string
+      }
       const newToken = data.access_token ?? null
       setAccessToken(newToken)
+      if (data.refresh_token && typeof window !== "undefined") {
+        localStorage.setItem("refresh_token", data.refresh_token)
+      }
       return newToken
     } catch {
       return null
@@ -69,13 +79,69 @@ export async function refreshAccessToken(): Promise<string | null> {
 // ---------------------------------------------------------------------------
 // Helper: build headers with optional Authorization
 // ---------------------------------------------------------------------------
-function buildHeaders(init?: RequestInit): HeadersInit {
+function buildHeaders(init?: RequestInit, json = true): HeadersInit {
   const token = getAccessToken()
-  return {
-    "Content-Type": "application/json",
-    ...(init?.headers ?? {}),
+  const headers: Record<string, string> = {
+    ...(init?.headers as Record<string, string> | undefined),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
+  if (json && !(init?.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json"
+  }
+  return headers
+}
+
+async function handleResponse<T>(response: Response): Promise<T> {
+  if (response.status >= 400) {
+    await throwApiError(response)
+  }
+  if (response.status === 204) {
+    return undefined as T
+  }
+  return (await response.json()) as T
+}
+
+/** Multipart/form-data (file uploads). Do not set Content-Type manually. */
+export async function apiFormRequest<T>(
+  path: string,
+  formData: FormData,
+  init?: RequestInit
+): Promise<T> {
+  const url = `${API_BASE_URL}${path}`
+  const method = init?.method ?? "POST"
+
+  const doFetch = () =>
+    fetch(url, {
+      ...init,
+      method,
+      headers: buildHeaders(init, false),
+      body: formData,
+    })
+
+  let response = await doFetch()
+
+  if (response.status === 401) {
+    const newToken = await refreshAccessToken()
+    if (!newToken) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("refresh_token")
+        setAccessToken(null)
+        window.location.href = "/auth/login"
+      }
+      await throwApiError(response)
+    }
+    response = await doFetch()
+    if (response.status === 401) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("refresh_token")
+        setAccessToken(null)
+        window.location.href = "/auth/login"
+      }
+      await throwApiError(response)
+    }
+  }
+
+  return handleResponse<T>(response)
 }
 
 // ---------------------------------------------------------------------------
@@ -157,15 +223,5 @@ export async function apiRequest<T>(
     response = retryResponse
   }
 
-  // --- Handle all other 4xx / 5xx responses ---
-  if (response.status >= 400) {
-    await throwApiError(response)
-  }
-
-  // --- Success ---
-  if (response.status === 204) {
-    return undefined as T
-  }
-
-  return (await response.json()) as T
+  return handleResponse<T>(response)
 }

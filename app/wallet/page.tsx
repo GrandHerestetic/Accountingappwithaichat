@@ -34,56 +34,15 @@ export default function WalletPage() {
   const [transactionType, setTransactionType] = useState<string>("all")
   const [filteredTransactions, setFilteredTransactions] = useState<any[]>([])
 
-  const balance = 15000
-  const transactions = [
-    {
-      id: 1,
-      type: "expense",
-      description: "Отклик на заказ 'Ведение бухучета'",
-      amount: -1000,
-      date: "2024-01-25T10:30:00",
-      status: "completed",
-    },
-    {
-      id: 2,
-      type: "expense",
-      description: "Получение контактов заказчика",
-      amount: -800,
-      date: "2024-01-24T15:20:00",
-      status: "completed",
-    },
-    {
-      id: 3,
-      type: "income",
-      description: "Пополнение баланса",
-      amount: 10000,
-      date: "2024-01-20T09:15:00",
-      status: "completed",
-    },
-    {
-      id: 4,
-      type: "income",
-      description: "Оплата за заказ #1234",
-      amount: 45000,
-      date: "2024-01-18T14:45:00",
-      status: "completed",
-    },
-    {
-      id: 5,
-      type: "expense",
-      description: "Отклик на заказ 'Налоговое консультирование'",
-      amount: -700,
-      date: "2024-01-15T11:10:00",
-      status: "completed",
-    },
-  ]
+  const balance = 0
+  const transactions: { id: string; type: string; description: string; amount: number; date: string; status: string }[] = []
 
   const handleTopUp = () => {
     if (!topUpAmount || Number.parseInt(topUpAmount) < 1000) {
       alert("Минимальная сумма пополнения: 1000 ₸")
       return
     }
-    alert(`Баланс пополнен на ${topUpAmount} ₸`)
+    // Пополнение через платёжный шлюз — в разработке
     setTopUpAmount("")
   }
 
@@ -96,7 +55,7 @@ export default function WalletPage() {
       alert("Недостаточно средств на балансе")
       return
     }
-    alert(`Заявка на вывод ${withdrawAmount} ₸ создана`)
+    // Вывод средств — в разработке
     setWithdrawAmount("")
     setIsWithdrawDialogOpen(false)
   }

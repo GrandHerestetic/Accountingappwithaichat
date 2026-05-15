@@ -141,20 +141,10 @@ self.addEventListener("sync", (event) => {
 // Функция синхронизации сообщений
 async function syncMessages() {
   try {
-    console.log("Syncing messages...")
-    const response = await fetch("/api/chat/sync", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
-
-    if (response.ok) {
-      const data = await response.json()
-      console.log("Sync response:", data)
-
-      // Показываем уведомления о новых сообщениях
-      if (data.newMessages && data.newMessages.length > 0) {
+    // Chat sync handled by REST polling in the app (useChat hook)
+    return
+    const data = { newMessages: [] }
+    if (false && data.newMessages && data.newMessages.length > 0) {
         for (const message of data.newMessages) {
           await self.registration.showNotification("Новое сообщение", {
             body: `${message.senderName}: ${message.text}`,

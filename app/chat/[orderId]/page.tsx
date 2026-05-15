@@ -31,7 +31,7 @@ import { toast } from "sonner"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useChat } from "@/hooks/use-chat"
-import { apiRequest } from "@/lib/api-client"
+import { getMyChat, listMyChats, markChatRead, uploadAndAttach } from "@/lib/api"
 import type { Chat } from "@/lib/api/types"
 
 export default function OrderChatPage({ params }: { params: { orderId: string } }) {
@@ -41,38 +41,55 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
   const [chat, setChat] = useState<Chat | null>(null)
   const [loadingChat, setLoadingChat] = useState(true)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // orderId param is the chat ID in this route
-  const chatId = params.orderId
+  const [chatId, setChatId] = useState<string | null>(null)
 
   const { messages, sendMessage, handleTyping, isConnected, error } = useChat({
-    chatId,
+    chatId: chatId ?? "",
     userId: user?.id ?? "",
   })
 
   // Fetch chat metadata
   const fetchChat = useCallback(async () => {
     try {
-      // The chat list endpoint returns chats; we find the one matching chatId
-      // Alternatively, if there's a direct GET /api/v1/my/chats/:id endpoint, use that
-      const data = await apiRequest<{ items: Chat[] }>(
-        "/api/v1/my/chats?page=1&page_size=100"
-      )
-      const found = data.items.find((c) => c.id === chatId)
-      if (found) setChat(found)
+      const orderOrChatId = params.orderId
+      try {
+        const detail = await getMyChat(orderOrChatId)
+        setChat({
+          id: detail.id,
+          order_id: detail.order_id,
+          participant_ids: detail.participants?.map((p) => p.user_id) ?? [],
+          created_at: detail.created_at,
+          participants: detail.participants,
+        })
+        setChatId(detail.id)
+      } catch {
+        const data = await listMyChats({ page: 1, pageSize: 100 })
+        const found =
+          data.items.find((c) => c.id === orderOrChatId) ??
+          data.items.find((c) => c.order_id === orderOrChatId)
+        if (found) {
+          setChat(found)
+          setChatId(found.id)
+        }
+      }
     } catch {
-      // Silently ignore — UI still works with useChat hook
+      // ignore
     } finally {
       setLoadingChat(false)
     }
-  }, [chatId])
+  }, [params.orderId])
 
   useEffect(() => {
     fetchChat()
-    // Mark messages as read on open
-    apiRequest(`/api/v1/my/chats/${chatId}/read`, { method: "POST" }).catch(() => {})
-  }, [chatId, fetchChat])
+  }, [fetchChat])
+
+  useEffect(() => {
+    if (chatId) markChatRead(chatId).catch(() => {})
+  }, [chatId])
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -108,7 +125,26 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
   }
 
   const handleUploadFiles = () => {
-    alert("Функция загрузки файлов будет доступна в следующем обновлении!")
+    if (!chatId) {
+      toast.error("Чат ещё загружается")
+      return
+    }
+    fileInputRef.current?.click()
+  }
+
+  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length || !chatId) return
+    setUploading(true)
+    try {
+      await uploadAndAttach(files, "chat_attachment", chatId)
+      toast.success(files.length === 1 ? "Файл загружен" : `Загружено файлов: ${files.length}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось загрузить файлы")
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -198,8 +234,25 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
                       </div>
 
                       <div className="pt-4 border-t space-y-2">
-                        <Button className="w-full" variant="outline" onClick={handleUploadFiles}>
-                          <Upload className="w-4 h-4 mr-2" />
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          className="hidden"
+                          multiple
+                          accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                          onChange={handleFilesSelected}
+                        />
+                        <Button
+                          className="w-full"
+                          variant="outline"
+                          onClick={handleUploadFiles}
+                          disabled={uploading || !chatId}
+                        >
+                          {uploading ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Upload className="w-4 h-4 mr-2" />
+                          )}
                           Загрузить файлы
                         </Button>
                         <Button
