@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { MessageCircle, CheckCircle, Calendar } from "lucide-react"
 import { toast } from "sonner"
-import { apiRequest } from "@/lib/api-client"
+import { listClientOrderResponses, selectClientResponse } from "@/lib/api"
 import type { OrderResponse, ResponseStatus, PaginatedResponse } from "@/lib/api/types"
 
 // ─── Req 4.8: distinct badge colors per response status ─────────────────────
@@ -50,9 +50,7 @@ export default function OrderResponses({ params }: { params: { id: string } }) {
   const fetchResponses = useCallback(async () => {
     setIsLoading(true)
     try {
-      const data = await apiRequest<PaginatedResponse<OrderResponse>>(
-        `/api/v1/client/orders/${orderId}/responses`,
-      )
+      const data = await listClientOrderResponses(orderId)
       // Req 4.5 / 4.7: display only responses where is_paid === true
       setResponses(data.items.filter((r) => r.is_paid === true))
     } catch (err: unknown) {
@@ -72,10 +70,7 @@ export default function OrderResponses({ params }: { params: { id: string } }) {
   const handleSelectExecutor = async (responseId: string) => {
     setSelectingId(responseId)
     try {
-      await apiRequest(
-        `/api/v1/client/orders/${orderId}/select-response/${responseId}`,
-        { method: "POST" },
-      )
+      await selectClientResponse(orderId, responseId)
       toast.success("Исполнитель выбран!")
       await fetchResponses()
     } catch (err: unknown) {

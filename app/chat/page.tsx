@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { Send, Search, MoreVertical, Phone, Video, Paperclip, Smile, Circle, Loader2, AlertCircle } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { apiRequest } from "@/lib/api-client"
+import { listMyChats, markChatRead } from "@/lib/api"
 import { useAuth } from "@/contexts/auth-context"
 import { useChat } from "@/hooks/use-chat"
 import type { Chat, PaginatedResponse } from "@/lib/api/types"
@@ -41,7 +41,7 @@ function ChatWindow({ chat, userId }: { chat: ChatListItem; userId: string }) {
 
   // Mark as read on open
   useEffect(() => {
-    apiRequest(`/api/v1/my/chats/${chat.id}/read`, { method: "POST" }).catch(() => {})
+    markChatRead(chat.id).catch(() => {})
   }, [chat.id])
 
   const handleSend = async () => {
@@ -217,9 +217,7 @@ export default function ChatPage() {
 
   const fetchChats = useCallback(async () => {
     try {
-      const data = await apiRequest<PaginatedResponse<Chat>>(
-        "/api/v1/my/chats?page=1&page_size=20"
-      )
+      const data = await listMyChats({ page: 1, pageSize: 20 })
       setChats(data.items as ChatListItem[])
       if (data.items.length > 0 && !selectedChatId) {
         setSelectedChatId(data.items[0].id)

@@ -27,7 +27,11 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
-import { apiRequest } from "@/lib/api-client"
+import {
+  completeClientOrder,
+  createClientOrderReview,
+  getClientOrderReview,
+} from "@/lib/api"
 import type { Review, ApiError } from "@/lib/api/types"
 import { toast } from "sonner"
 
@@ -51,21 +55,16 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
     const fetchReview = async () => {
       setIsLoadingReview(true)
       try {
-        const review = await apiRequest<Review>(`/api/v1/client/orders/${orderId}/review`, {
-          method: "GET",
-        })
-        // HTTP 200 — review exists, disable form
-        setExistingReview(review)
-        setRating(review.rating)
-        setComment(review.comment)
-      } catch (err) {
-        const apiErr = err as ApiError
-        if (apiErr.status === 404) {
-          // No review yet — show the form
-          setExistingReview(null)
+        const review = await getClientOrderReview(orderId)
+        if (review) {
+          setExistingReview(review)
+          setRating(review.rating)
+          setComment(review.comment ?? "")
         } else {
-          toast.error(apiErr.message ?? "Не удалось загрузить отзыв")
+          setExistingReview(null)
         }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Не удалось загрузить отзыв")
       } finally {
         setIsLoadingReview(false)
       }
@@ -78,9 +77,7 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
   const handleCompleteOrder = async () => {
     setIsCompleting(true)
     try {
-      await apiRequest<void>(`/api/v1/client/orders/${orderId}/complete`, {
-        method: "POST",
-      })
+      await completeClientOrder(orderId)
       toast.success("Заказ успешно завершён! Теперь вы можете оставить отзыв.")
       setOrderCompleted(true)
     } catch (err) {
@@ -104,10 +101,7 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
 
     setIsSubmittingReview(true)
     try {
-      await apiRequest<Review>(`/api/v1/client/orders/${orderId}/review`, {
-        method: "POST",
-        body: JSON.stringify({ rating, comment: comment.trim() }),
-      })
+      await createClientOrderReview(orderId, { rating, comment: comment.trim() })
       toast.success("Отзыв успешно отправлен!")
       router.push(`/client/order/${orderId}`)
     } catch (err) {

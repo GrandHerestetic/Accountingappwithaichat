@@ -5,12 +5,18 @@ import type {
   ChatDetail,
   Course,
   CourseAssignment,
+  CourseDetailResponse,
   CourseMaterial,
+  CreateAssignmentRequest,
   CreateCourseRequest,
+  CreateEntityReviewRequest,
   CreateOrderRequest,
   CreateReviewRequest,
   AttachmentTargetType,
   AttachmentView,
+  CreditWalletRequest,
+  EntityRatingSummary,
+  EntityReview,
   ExecutorLeadSubmittedResponse,
   ExecutorLeadView,
   MeResponse,
@@ -23,12 +29,17 @@ import type {
   ProfileResponse,
   RatingInfo,
   Review,
+  ReviewTargetType,
+  ReorderAttachmentsRequest,
   Sanction,
   Selection,
+  SetAvatarRequest,
+  UpdateCourseRequest,
   UpdateOrderRequest,
   UpdateProfileRequest,
   UpdateResponseRequest,
   UserProfile,
+  WalletResponse,
 } from "./types"
 
 export type ListParams = {
@@ -61,6 +72,17 @@ export async function updateProfile(body: UpdateProfileRequest): Promise<Profile
     method: "PATCH",
     body: JSON.stringify(body),
   })
+}
+
+export async function setProfileAvatar(uploadId: string): Promise<void> {
+  await apiRequest("/api/v1/profile/avatar", {
+    method: "PATCH",
+    body: JSON.stringify({ upload_id: uploadId } satisfies SetAvatarRequest),
+  })
+}
+
+export async function clearProfileAvatar(): Promise<void> {
+  await apiRequest("/api/v1/profile/avatar", { method: "DELETE" })
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
@@ -118,10 +140,32 @@ export async function cancelMyOrder(id: string): Promise<void> {
   return apiRequest(`/api/v1/orders/my/${id}/cancel`, { method: "POST" })
 }
 
+export async function deleteMyOrder(id: string): Promise<void> {
+  return apiRequest(`/api/v1/orders/my/${id}`, { method: "DELETE" })
+}
+
+export async function getMyOrderResponse(
+  orderId: string,
+  responseId: string
+): Promise<OrderResponse> {
+  return apiRequest(`/api/v1/orders/${orderId}/responses/my/${responseId}`)
+}
+
+export async function listMyOrderResponses(orderId: string): Promise<PaginatedResponse<OrderResponse>> {
+  return apiRequest(`/api/v1/orders/${orderId}/responses/my`)
+}
+
 // ─── Client order lifecycle ───────────────────────────────────────────────────
 
 export async function listClientOrderResponses(orderId: string): Promise<PaginatedResponse<OrderResponse>> {
   return apiRequest(`/api/v1/client/orders/${orderId}/responses`)
+}
+
+export async function getClientOrderResponse(
+  orderId: string,
+  responseId: string
+): Promise<OrderResponse> {
+  return apiRequest(`/api/v1/client/orders/${orderId}/responses/${responseId}`)
 }
 
 export async function selectClientResponse(orderId: string, responseId: string): Promise<void> {
@@ -217,6 +261,64 @@ export async function listMySanctions(params?: ListParams): Promise<PaginatedRes
   )
 }
 
+export async function getMyResponse(responseId: string): Promise<OrderResponse> {
+  return apiRequest(`/api/v1/my/responses/${responseId}`)
+}
+
+// ─── Wallet ───────────────────────────────────────────────────────────────────
+
+export async function getMyWallet(): Promise<WalletResponse> {
+  return apiRequest<WalletResponse>("/api/v1/my/wallet")
+}
+
+export async function getAdminWallet(userId: string): Promise<WalletResponse> {
+  return apiRequest<WalletResponse>(`/api/v1/admin/wallets/${userId}`)
+}
+
+export async function creditAdminWallet(
+  userId: string,
+  body: CreditWalletRequest
+): Promise<WalletResponse> {
+  await apiRequest(`/api/v1/admin/wallets/${userId}/credit`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
+  return getAdminWallet(userId)
+}
+
+// ─── Generic reviews & ratings ──────────────────────────────────────────────
+
+export async function listEntityReviews(
+  targetType: ReviewTargetType,
+  targetId: string,
+  params?: ListParams
+): Promise<PaginatedResponse<EntityReview>> {
+  return apiRequest(
+    `/api/v1/reviews${qs({
+      target_type: targetType,
+      target_id: targetId,
+      page: params?.page ?? 1,
+      page_size: params?.pageSize ?? 20,
+    })}`
+  )
+}
+
+export async function createEntityReview(body: CreateEntityReviewRequest): Promise<EntityReview> {
+  return apiRequest<EntityReview>("/api/v1/reviews", {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
+}
+
+export async function getEntityRating(
+  targetType: ReviewTargetType,
+  targetId: string
+): Promise<EntityRatingSummary> {
+  return apiRequest(
+    `/api/v1/ratings${qs({ target_type: targetType, target_id: targetId })}`
+  )
+}
+
 // ─── Files & attachments ──────────────────────────────────────────────────────
 
 function parseUploadList(data: { items?: UploadView[] } | UploadView[]): UploadView[] {
@@ -240,6 +342,14 @@ export async function uploadFiles(files: File[]): Promise<UploadView[]> {
 export async function listMyFiles(): Promise<UploadView[]> {
   const data = await apiRequest<{ items: UploadView[] }>("/api/v1/my/files")
   return data.items ?? (data as unknown as UploadView[])
+}
+
+export async function getFile(id: string): Promise<UploadView> {
+  return apiRequest<UploadView>(`/api/v1/files/${id}`)
+}
+
+export async function deleteFile(id: string): Promise<void> {
+  return apiRequest(`/api/v1/files/${id}`, { method: "DELETE" })
 }
 
 export async function attachFiles(
@@ -267,6 +377,17 @@ export async function listAttachments(
     `/api/v1/attachments${qs({ target_type: targetType, target_id: targetId })}`
   )
   return data.items ?? []
+}
+
+export async function deleteAttachment(id: string): Promise<void> {
+  return apiRequest(`/api/v1/attachments/${id}`, { method: "DELETE" })
+}
+
+export async function reorderAttachments(ids: string[]): Promise<void> {
+  await apiRequest("/api/v1/attachments/reorder", {
+    method: "PATCH",
+    body: JSON.stringify({ ids } satisfies ReorderAttachmentsRequest),
+  })
 }
 
 export async function uploadAndAttach(
@@ -367,12 +488,18 @@ export async function listCourses(params?: ListParams): Promise<PaginatedRespons
   )
 }
 
+export async function getCourseDetail(id: string): Promise<CourseDetailResponse> {
+  return apiRequest<CourseDetailResponse>(`/api/v1/courses/${id}`)
+}
+
 export async function getCourse(id: string): Promise<Course> {
-  return apiRequest<Course>(`/api/v1/courses/${id}`)
+  const data = await getCourseDetail(id)
+  return data.course
 }
 
 export async function getCourseMaterials(id: string): Promise<CourseMaterial[]> {
-  return apiRequest<CourseMaterial[]>(`/api/v1/courses/${id}/materials`)
+  const data = await getCourseDetail(id)
+  return data.materials ?? []
 }
 
 export async function listCoachCourses(params?: ListParams): Promise<PaginatedResponse<Course>> {
@@ -385,13 +512,62 @@ export async function createCoachCourse(body: CreateCourseRequest): Promise<Cour
   return apiRequest<Course>("/api/v1/coach/courses", { method: "POST", body: JSON.stringify(body) })
 }
 
+export async function getCoachCourseDetail(id: string): Promise<CourseDetailResponse> {
+  return apiRequest<CourseDetailResponse>(`/api/v1/coach/courses/${id}`)
+}
+
+export async function updateCoachCourse(id: string, body: UpdateCourseRequest): Promise<Course> {
+  return apiRequest<Course>(`/api/v1/coach/courses/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  })
+}
+
+export async function archiveCoachCourse(id: string): Promise<Course> {
+  return apiRequest<Course>(`/api/v1/coach/courses/${id}/archive`, { method: "POST" })
+}
+
 export async function createCoachCourseMaterial(
   courseId: string,
-  body: { title: string; type: "video" | "pdf" | "link" | "text"; url?: string; content?: string }
+  body: {
+    title: string
+    type: "video" | "pdf" | "link" | "text"
+    url?: string
+    content?: string
+    upload_id?: string
+    position?: number
+  }
 ): Promise<CourseMaterial> {
   return apiRequest<CourseMaterial>(`/api/v1/coach/courses/${courseId}/materials`, {
     method: "POST",
     body: JSON.stringify(body),
+  })
+}
+
+export async function updateCoachCourseMaterial(
+  courseId: string,
+  materialId: string,
+  body: {
+    title?: string
+    type?: "video" | "pdf" | "link" | "text"
+    url?: string
+    content?: string
+    upload_id?: string
+    position?: number
+  }
+): Promise<CourseMaterial> {
+  return apiRequest<CourseMaterial>(
+    `/api/v1/coach/courses/${courseId}/materials/${materialId}`,
+    { method: "PATCH", body: JSON.stringify(body) }
+  )
+}
+
+export async function deleteCoachCourseMaterial(
+  courseId: string,
+  materialId: string
+): Promise<void> {
+  return apiRequest(`/api/v1/coach/courses/${courseId}/materials/${materialId}`, {
+    method: "DELETE",
   })
 }
 
@@ -411,6 +587,10 @@ export async function listMyCourseAssignments(params?: ListParams & {
   )
 }
 
+export async function getMyCourseAssignment(id: string): Promise<CourseAssignment> {
+  return apiRequest<CourseAssignment>(`/api/v1/my/course-assignments/${id}`)
+}
+
 export async function markCourseAssignmentCompleted(id: string): Promise<void> {
   return apiRequest(`/api/v1/my/course-assignments/${id}/mark-completed`, { method: "POST" })
 }
@@ -427,6 +607,20 @@ export async function listAdminExecutorLeads(params?: ListParams & {
       status: params?.status,
     })}`
   )
+}
+
+export async function getAdminExecutorLead(id: string): Promise<ExecutorLeadView> {
+  return apiRequest<ExecutorLeadView>(`/api/v1/admin/executor-leads/${id}`)
+}
+
+export async function updateAdminExecutorLeadStatus(
+  id: string,
+  status: string
+): Promise<ExecutorLeadView> {
+  return apiRequest(`/api/v1/admin/executor-leads/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  })
 }
 
 export async function approveExecutorLead(id: string, notes?: string): Promise<{ user_id: string }> {
@@ -449,6 +643,10 @@ export async function listAdminSanctions(params?: ListParams): Promise<Paginated
   )
 }
 
+export async function getAdminSanction(id: string): Promise<Sanction> {
+  return apiRequest<Sanction>(`/api/v1/admin/sanctions/${id}`)
+}
+
 export async function liftAdminSanction(id: string): Promise<void> {
   return apiRequest(`/api/v1/admin/sanctions/${id}/lift`, { method: "POST" })
 }
@@ -460,10 +658,59 @@ export async function listAdminChats(params?: ListParams): Promise<PaginatedResp
   return { ...data, items: data.items.map(normalizeChatSummary) }
 }
 
+export async function getAdminChat(chatId: string): Promise<ChatDetail> {
+  return apiRequest<ChatDetail>(`/api/v1/admin/chats/${chatId}`)
+}
+
+export async function listAdminChatMessages(
+  chatId: string,
+  params?: ListParams
+): Promise<PaginatedResponse<import("./types").Message>> {
+  return apiRequest(
+    `/api/v1/admin/chats/${chatId}/messages${qs({
+      page: params?.page ?? 1,
+      page_size: params?.pageSize ?? 50,
+    })}`
+  )
+}
+
+export async function listAdminCourseAssignments(
+  params?: ListParams & {
+    executorId?: string
+    courseId?: string
+    status?: string
+    source?: string
+  }
+): Promise<PaginatedResponse<CourseAssignment>> {
+  return apiRequest(
+    `/api/v1/admin/course-assignments${qs({
+      page: params?.page ?? 1,
+      page_size: params?.pageSize ?? 20,
+      executor_id: params?.executorId,
+      course_id: params?.courseId,
+      status: params?.status,
+      source: params?.source,
+    })}`
+  )
+}
+
+export async function createAdminCourseAssignment(
+  body: CreateAssignmentRequest
+): Promise<CourseAssignment> {
+  return apiRequest<CourseAssignment>("/api/v1/admin/course-assignments", {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
+}
+
 export async function listAdminNotifications(params?: ListParams): Promise<PaginatedResponse<Notification>> {
   return apiRequest(
     `/api/v1/admin/notifications${qs({ page: params?.page ?? 1, page_size: params?.pageSize ?? 20 })}`
   )
+}
+
+export async function getAdminNotification(id: string): Promise<Notification> {
+  return apiRequest<Notification>(`/api/v1/admin/notifications/${id}`)
 }
 
 export async function pingApi(): Promise<{ status: string }> {

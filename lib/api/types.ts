@@ -238,6 +238,16 @@ export interface CreateCourseRequest {
   description: string
 }
 
+export interface UpdateCourseRequest {
+  title?: string
+  description?: string
+}
+
+export interface CourseDetailResponse {
+  course: Course
+  materials: CourseMaterial[]
+}
+
 export interface CourseMaterial {
   id: string
   course_id: string
@@ -285,6 +295,91 @@ export interface RatingInfo {
   reviews_count_recent: number
   avg_rating_recent: number
   avg_rating_total: number
+}
+
+export type ReviewTargetType =
+  | "user"
+  | "client"
+  | "executor"
+  | "coach"
+  | "profile"
+  | "order"
+  | "response"
+  | "review"
+  | "course"
+  | "course_material"
+
+export interface EntityReview {
+  id: string
+  target_type: ReviewTargetType
+  target_id: string
+  author_id?: string
+  rating: number
+  comment?: string
+  metadata?: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateEntityReviewRequest {
+  target_type: ReviewTargetType
+  target_id: string
+  rating: number
+  comment?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface EntityRatingSummary {
+  target_type: ReviewTargetType
+  target_id: string
+  rating_avg: number
+  rating_count: number
+  updated_at: string
+}
+
+export interface Wallet {
+  user_id: string
+  balance: number
+  currency: string
+  updated_at: string
+}
+
+export interface WalletTransaction {
+  id: string
+  user_id: string
+  amount: number
+  direction: "credit" | "debit"
+  currency: string
+  reason: string
+  order_id?: string
+  created_by?: string
+  created_at: string
+}
+
+export interface WalletResponse {
+  wallet: Wallet
+  transactions: WalletTransaction[]
+}
+
+export interface CreditWalletRequest {
+  amount: number
+  reason?: string
+}
+
+export interface SetAvatarRequest {
+  upload_id: string
+}
+
+export interface CreateAssignmentRequest {
+  course_id: string
+  executor_id: string
+  source: "manual_admin" | "sanction_low_rating_first" | "sanction_low_rating_repeat"
+  due_at?: string
+  reason?: string
+}
+
+export interface ReorderAttachmentsRequest {
+  ids: string[]
 }
 
 // Sanctions & leads

@@ -9,7 +9,7 @@ import { BookOpen, CheckCircle, Clock, Loader2, XCircle } from "lucide-react"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
-import { apiRequest } from "@/lib/api-client"
+import { listMyCourseAssignments, markCourseAssignmentCompleted } from "@/lib/api"
 import type { CourseAssignment, PaginatedResponse } from "@/lib/api/types"
 import { toast } from "sonner"
 
@@ -47,9 +47,11 @@ export default function ExecutorCoursesPage() {
         params.set("status", statusFilter)
       }
 
-      const data = await apiRequest<PaginatedResponse<CourseAssignment>>(
-        `/api/v1/my/course-assignments?${params.toString()}`
-      )
+      const data = await listMyCourseAssignments({
+        page: 1,
+        pageSize: 50,
+        status: params.get("status") ?? undefined,
+      })
       setAssignments(data.items)
     } catch (err) {
       const message = err instanceof Error ? err.message : "Не удалось загрузить назначенные курсы"
@@ -69,9 +71,7 @@ export default function ExecutorCoursesPage() {
   const handleMarkCompleted = async (assignmentId: string) => {
     setMarkingId(assignmentId)
     try {
-      await apiRequest(`/api/v1/my/course-assignments/${assignmentId}/mark-completed`, {
-        method: "POST",
-      })
+      await markCourseAssignmentCompleted(assignmentId)
       // Update the assignment status in the UI immediately
       setAssignments((prev) =>
         prev.map((a) =>

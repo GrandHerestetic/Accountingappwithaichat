@@ -36,8 +36,13 @@ import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/contexts/auth-context"
-import { apiRequest } from "@/lib/api-client"
-import type { Order, OrderStatus, PaginatedResponse } from "@/lib/api/types"
+import {
+  cancelMyOrder,
+  listMyOrders,
+  submitMyOrder,
+  updateMyOrder,
+} from "@/lib/api"
+import type { Order, OrderStatus } from "@/lib/api/types"
 import { toast } from "sonner"
 
 // ─── Status badge colors (Req 3.8) ──────────────────────────────────────────
@@ -100,9 +105,7 @@ export default function ClientDashboard() {
   const fetchOrders = useCallback(async () => {
     setIsLoading(true)
     try {
-      const data = await apiRequest<PaginatedResponse<Order>>(
-        `/api/v1/orders/my?page=${page}&page_size=20`,
-      )
+      const data = await listMyOrders({ page, pageSize: 20 })
       setOrders(data.items)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Не удалось загрузить заказы"
@@ -132,10 +135,7 @@ export default function ClientDashboard() {
   const handleSubmitOrder = async (orderId: string) => {
     setSubmittingId(orderId)
     try {
-      const result = await apiRequest<{ checkout_url?: string }>(
-        `/api/v1/orders/my/${orderId}/submit`,
-        { method: "POST" },
-      )
+      const result = await submitMyOrder(orderId)
       if (result?.checkout_url) {
         window.open(result.checkout_url, "_blank")
       } else {
@@ -159,7 +159,7 @@ export default function ClientDashboard() {
     if (!cancelDialog.orderId) return
     setIsCancelling(true)
     try {
-      await apiRequest(`/api/v1/orders/my/${cancelDialog.orderId}/cancel`, { method: "POST" })
+      await cancelMyOrder(cancelDialog.orderId)
       toast.success("Заказ отменён")
       setCancelDialog({ open: false, orderId: null })
       await fetchOrders()
@@ -198,10 +198,7 @@ export default function ClientDashboard() {
 
     setIsSavingEdit(true)
     try {
-      await apiRequest(`/api/v1/orders/my/${editState.order.id}`, {
-        method: "PATCH",
-        body: JSON.stringify(patch),
-      })
+      await updateMyOrder(editState.order.id, patch)
       toast.success("Заказ обновлён")
       setEditState((s) => ({ ...s, open: false }))
       await fetchOrders()

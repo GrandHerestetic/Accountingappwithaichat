@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BookOpen, Play, Download, ExternalLink, Loader2, ArrowLeft } from "lucide-react"
-import { apiRequest } from "@/lib/api-client"
+import { getCourseDetail } from "@/lib/api"
 import type { Course, CourseMaterial } from "@/lib/api/types"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -26,8 +26,9 @@ export default function CourseDetailPage() {
     const fetchCourse = async () => {
       setLoading(true)
       try {
-        const data = await apiRequest<Course>(`/api/v1/courses/${courseId}`)
-        setCourse(data)
+        const detail = await getCourseDetail(courseId)
+        setCourse(detail.course)
+        setMaterials(detail.materials ?? [])
       } catch (err) {
         const message = err instanceof Error ? err.message : "Не удалось загрузить курс"
         toast.error(message)
@@ -36,24 +37,6 @@ export default function CourseDetailPage() {
       }
     }
     fetchCourse()
-  }, [courseId])
-
-  // Fetch materials separately if the API returns them as a nested list
-  // (the Course type doesn't include materials inline, so we try a materials endpoint)
-  useEffect(() => {
-    if (!courseId) return
-    const fetchMaterials = async () => {
-      try {
-        // Try fetching materials — endpoint may not exist for public users; ignore errors
-        const data = await apiRequest<CourseMaterial[]>(
-          `/api/v1/courses/${courseId}/materials`
-        )
-        if (Array.isArray(data)) setMaterials(data)
-      } catch {
-        // Materials endpoint may require auth or not exist — silently ignore
-      }
-    }
-    fetchMaterials()
   }, [courseId])
 
   // ---------------------------------------------------------------------------

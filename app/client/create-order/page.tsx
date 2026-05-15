@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { Calendar, MapPin, DollarSign, TrendingUp, Pin, Palette, CreditCard } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
-import { apiRequest } from "@/lib/api-client"
+import { createOrder, submitMyOrder } from "@/lib/api"
 import type { CreateOrderRequest, Order } from "@/lib/api/types"
 import { toast } from "sonner"
 
@@ -129,15 +129,9 @@ export default function CreateOrder() {
 
     setIsSubmitting(true)
     try {
-      const order = await apiRequest<Order>("/api/v1/orders", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      })
+      const order = await createOrder(payload)
 
-      // After creating the draft order, submit it for payment
-      const submitResult = await apiRequest<{ checkout_url?: string }>(`/api/v1/orders/my/${order.id}/submit`, {
-        method: "POST",
-      })
+      const submitResult = await submitMyOrder(order.id)
 
       if (submitResult?.checkout_url) {
         window.open(submitResult.checkout_url, "_blank")

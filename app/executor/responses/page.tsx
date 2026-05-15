@@ -20,7 +20,12 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
-import { apiRequest } from "@/lib/api-client"
+import {
+  cancelMyResponse,
+  listMyResponses,
+  submitMyResponse,
+  updateMyResponse,
+} from "@/lib/api"
 import type { OrderResponse, ResponseStatus, PaginatedResponse } from "@/lib/api/types"
 
 // ─── Req 4.8: distinct badge colors per response status ─────────────────────
@@ -72,9 +77,7 @@ export default function ExecutorResponsesPage() {
   const fetchResponses = useCallback(async () => {
     setIsLoading(true)
     try {
-      const data = await apiRequest<PaginatedResponse<OrderResponse>>(
-        `/api/v1/my/responses?page=${page}&page_size=20`,
-      )
+      const data = await listMyResponses({ page, pageSize: 20 })
       setResponses(data.items)
     } catch (err: unknown) {
       // Req 4.9: error toast on API failure
@@ -127,13 +130,7 @@ export default function ExecutorResponsesPage() {
 
     setIsSavingEdit(true)
     try {
-      await apiRequest(
-        `/api/v1/orders/${editState.response.order_id}/responses/my/${editState.response.id}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify(patch),
-        },
-      )
+      await updateMyResponse(editState.response.order_id, editState.response.id, patch)
       toast.success("Отклик обновлён")
       setEditState((s) => ({ ...s, open: false }))
       await fetchResponses()
@@ -150,10 +147,7 @@ export default function ExecutorResponsesPage() {
   const handleSubmitForPayment = async (response: OrderResponse) => {
     setSubmittingId(response.id)
     try {
-      const result = await apiRequest<{ checkout_url?: string }>(
-        `/api/v1/orders/${response.order_id}/responses/my/${response.id}/submit`,
-        { method: "POST" },
-      )
+      const result = await submitMyResponse(response.order_id, response.id)
       if (result?.checkout_url) {
         window.open(result.checkout_url, "_blank")
       } else {

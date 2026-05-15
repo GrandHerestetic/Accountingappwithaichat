@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search, Filter, X, BookOpen, Loader2 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
-import { apiRequest } from "@/lib/api-client"
+import { listCourses } from "@/lib/api"
 import type { Course, PaginatedResponse } from "@/lib/api/types"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -28,9 +28,7 @@ export default function CoursesPage() {
     const fetchCourses = async () => {
       setLoading(true)
       try {
-        const data = await apiRequest<PaginatedResponse<Course>>(
-          "/api/v1/courses?page=1&page_size=20"
-        )
+        const data = await listCourses({ page: 1, pageSize: 20 })
         // Display only published courses (requirement 7.1)
         setCourses(data.items.filter((c) => c.status === "published"))
       } catch (err) {

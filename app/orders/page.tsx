@@ -21,7 +21,7 @@ import {
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import { apiRequest } from "@/lib/api-client"
+import { listOrders } from "@/lib/api"
 import type { Order, OrderStatus, PaginatedResponse } from "@/lib/api/types"
 import { toast } from "sonner"
 
@@ -96,9 +96,15 @@ export default function PublicOrders() {
       if (budgetMax) params.set("budget_max", budgetMax)
       if (searchQuery.trim()) params.set("q", searchQuery.trim())
 
-      const data = await apiRequest<PaginatedResponse<Order>>(
-        `/api/v1/orders?${params.toString()}`
-      )
+      const data = await listOrders({
+        page: currentPage,
+        pageSize: PAGE_SIZE,
+        category:
+          selectedCategory && selectedCategory !== "Все категории" ? selectedCategory : undefined,
+        budgetMin: budgetMin ? Number(budgetMin) : undefined,
+        budgetMax: budgetMax ? Number(budgetMax) : undefined,
+        q: searchQuery.trim() || undefined,
+      })
       setOrders(data.items)
       setTotal(data.total)
     } catch (err) {

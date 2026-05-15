@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -21,6 +21,9 @@ import { Wallet, Plus, CreditCard, ArrowUpRight, ArrowDownLeft, Filter, Download
 import { Navigation } from "@/components/navigation"
 import { format } from "date-fns"
 import { ru } from "date-fns/locale"
+import { useMyWallet } from "@/hooks/use-swr-hooks"
+import { Loader2 } from "lucide-react"
+import { toast } from "sonner"
 
 export default function WalletPage() {
   const [activeTab, setActiveTab] = useState("overview")
@@ -32,10 +35,33 @@ export default function WalletPage() {
   const [dateFrom, setDateFrom] = useState<Date>()
   const [dateTo, setDateTo] = useState<Date>()
   const [transactionType, setTransactionType] = useState<string>("all")
-  const [filteredTransactions, setFilteredTransactions] = useState<any[]>([])
+  const [filteredTransactions, setFilteredTransactions] = useState<
+    { id: string; type: string; description: string; amount: number; date: string; status: string }[]
+  >([])
 
-  const balance = 0
-  const transactions: { id: string; type: string; description: string; amount: number; date: string; status: string }[] = []
+  const { data, isLoading, error } = useMyWallet()
+
+  const balance = data?.wallet.balance ?? 0
+  const currency = data?.wallet.currency ?? "KZT"
+
+  const transactions = useMemo(
+    () =>
+      (data?.transactions ?? []).map((t) => ({
+        id: t.id,
+        type: t.direction === "credit" ? "income" : "expense",
+        description: t.reason,
+        amount: t.direction === "credit" ? t.amount : -t.amount,
+        date: t.created_at,
+        status: "completed",
+      })),
+    [data?.transactions]
+  )
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось загрузить кошелёк")
+    }
+  }, [error])
 
   const handleTopUp = () => {
     if (!topUpAmount || Number.parseInt(topUpAmount) < 1000) {
@@ -129,7 +155,13 @@ export default function WalletPage() {
                     <Wallet className="w-8 h-8" />
                     <h2 className="text-2xl font-bold">Текущий баланс</h2>
                   </div>
-                  <p className="text-4xl font-bold">{balance.toLocaleString()} ₸</p>
+                  <p className="text-4xl font-bold">
+                    {isLoading ? (
+                      <Loader2 className="w-8 h-8 animate-spin inline" />
+                    ) : (
+                      `${balance.toLocaleString("ru-RU")} ${currency === "KZT" ? "₸" : currency}`
+                    )}
+                  </p>
                   <p className="text-green-100 mt-2">Доступно для использования</p>
                 </div>
                 <div className="text-right">

@@ -21,7 +21,11 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { apiRequest } from "@/lib/api-client"
+import {
+  listMyNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from "@/lib/api"
 import { useAuth } from "@/contexts/auth-context"
 import { useNotificationsPolling } from "@/hooks/use-notifications-polling"
 import type { Notification, NotificationType, PaginatedResponse } from "@/lib/api/types"
@@ -151,9 +155,13 @@ export default function NotificationsPage() {
           // filter locally
         }
 
-        const data = await apiRequest<PaginatedResponse<Notification>>(
-          `/api/v1/my/notifications?${params.toString()}`
-        )
+        const data = await listMyNotifications({
+          page,
+          pageSize: 20,
+          unreadOnly: params.get("unread_only") === "true",
+          type: params.get("type") ?? undefined,
+          status: params.get("status") ?? undefined,
+        })
 
         setTotal(data.total)
         setNotifications((prev) => (replace ? data.items : [...prev, ...data.items]))
@@ -196,7 +204,7 @@ export default function NotificationsPage() {
     )
 
     try {
-      await apiRequest(`/api/v1/my/notifications/${id}/read`, { method: "POST" })
+      await markNotificationRead(id)
     } catch (err) {
       // Revert
       setNotifications((ns) => ns.map((n) => (n.id === id ? { ...n, status: prev.status, read_at: prev.read_at } : n)))
@@ -217,7 +225,7 @@ export default function NotificationsPage() {
     )
 
     try {
-      await apiRequest("/api/v1/my/notifications/read-all", { method: "POST" })
+      await markAllNotificationsRead()
     } catch (err) {
       // Revert
       setNotifications(snapshot)

@@ -20,8 +20,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { apiRequest } from "@/lib/api-client"
-import { uploadAndAttach } from "@/lib/api"
+import { createOrderResponse, getOrder, submitMyResponse, uploadAndAttach } from "@/lib/api"
 import type { Order } from "@/lib/api/types"
 
 export default function ResponseToOrderPage({ params }: { params: { id: string } }) {
@@ -39,7 +38,7 @@ export default function ResponseToOrderPage({ params }: { params: { id: string }
   useEffect(() => {
     const fetchOrder = async () => {
       try {
-        const data = await apiRequest<Order>(`/api/v1/orders/${params.id}`)
+        const data = await getOrder(params.id)
         setOrder(data)
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Не удалось загрузить заказ"
@@ -111,17 +110,11 @@ export default function ResponseToOrderPage({ params }: { params: { id: string }
     setSubmitting(true)
     try {
       // Step 1: Create the response draft (Req 4.1)
-      const createdResponse = await apiRequest<{ id: string; status: string }>(
-        `/api/v1/orders/${params.id}/responses`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            proposed_amount: proposedAmount,
-            proposed_deadline: responseData.deadline,
-            cover_letter: responseData.message,
-          }),
-        },
-      )
+      const createdResponse = await createOrderResponse(params.id, {
+        proposed_amount: proposedAmount,
+        proposed_deadline: responseData.deadline,
+        cover_letter: responseData.message,
+      })
 
       if (responseData.attachments.length > 0) {
         await uploadAndAttach(
@@ -132,10 +125,7 @@ export default function ResponseToOrderPage({ params }: { params: { id: string }
       }
 
       // Step 2: Submit the response for payment (Req 4.4)
-      const submitResult = await apiRequest<{ checkout_url?: string }>(
-        `/api/v1/orders/${params.id}/responses/my/${createdResponse.id}/submit`,
-        { method: "POST" },
-      )
+      const submitResult = await submitMyResponse(params.id, createdResponse.id)
 
       if (submitResult.checkout_url) {
         window.open(submitResult.checkout_url, "_blank")
