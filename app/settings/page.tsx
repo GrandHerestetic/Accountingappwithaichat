@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label"
 import { PushNotificationSetup } from "@/components/push-notification-setup"
 import { User, Bell, Save, Loader2 } from "lucide-react"
 import { useEffect, useState } from "react"
-import { getProfile, updateProfile } from "@/lib/api"
+import { clearProfileAvatar, getProfile, setProfileAvatar, updateProfile, uploadFiles } from "@/lib/api"
+import { FileUploadField } from "@/components/file-upload-field"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 
@@ -16,6 +17,8 @@ export default function SettingsPage() {
   const { user, refreshUser } = useAuth()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarSaving, setAvatarSaving] = useState(false)
   const [form, setForm] = useState({
     display_name: "",
     phone: "",
@@ -43,6 +46,35 @@ export default function SettingsPage() {
       })
       .finally(() => setLoading(false))
   }, [user])
+
+  const handleAvatarSave = async () => {
+    if (!avatarFile) return
+    setAvatarSaving(true)
+    try {
+      const [upload] = await uploadFiles([avatarFile])
+      await setProfileAvatar(upload.id)
+      await refreshUser()
+      setAvatarFile(null)
+      toast.success("Аватар обновлён")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Ошибка загрузки аватара")
+    } finally {
+      setAvatarSaving(false)
+    }
+  }
+
+  const handleAvatarClear = async () => {
+    setAvatarSaving(true)
+    try {
+      await clearProfileAvatar()
+      await refreshUser()
+      toast.success("Аватар удалён")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Ошибка")
+    } finally {
+      setAvatarSaving(false)
+    }
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -81,6 +113,39 @@ export default function SettingsPage() {
                 <CardDescription>Данные из API /api/v1/profile</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div>
+                  <Label>Аватар</Label>
+                  <FileUploadField
+                    label="Загрузить фото профиля"
+                    hint="JPG, PNG до 5MB"
+                    value={avatarFile}
+                    onChange={setAvatarFile}
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={avatarSaving}
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!avatarFile || avatarSaving}
+                      onClick={handleAvatarSave}
+                    >
+                      {avatarSaving ? "Загрузка..." : "Применить аватар"}
+                    </Button>
+                    {user?.profile?.avatar_url && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={avatarSaving}
+                        onClick={handleAvatarClear}
+                      >
+                        Удалить аватар
+                      </Button>
+                    )}
+                  </div>
+                </div>
                 <div>
                   <Label>Email</Label>
                   <Input value={user?.email ?? ""} disabled />

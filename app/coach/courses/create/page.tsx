@@ -27,8 +27,13 @@ import {
   Briefcase,
 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { createCoachCourse, publishCoachCourse } from "@/lib/api"
 
 export default function CreateCoursePage() {
+  const router = useRouter()
+  const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState("basic")
   const [courseData, setCourseData] = useState({
     title: "",
@@ -66,6 +71,47 @@ export default function CreateCoursePage() {
   ]
 
   const levels = ["Начинающий", "Средний", "Продвинутый", "Эксперт"]
+
+  const handleSaveDraft = async () => {
+    if (!courseData.title.trim() || !courseData.description.trim()) {
+      toast.error("Укажите название и описание курса")
+      return
+    }
+    setSaving(true)
+    try {
+      await createCoachCourse({
+        title: courseData.title.trim(),
+        description: courseData.description.trim(),
+      })
+      toast.success("Черновик сохранён")
+      router.push("/coach/courses")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Ошибка сохранения")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handlePublish = async () => {
+    if (!courseData.title.trim() || !courseData.description.trim()) {
+      toast.error("Укажите название и описание курса")
+      return
+    }
+    setSaving(true)
+    try {
+      const course = await createCoachCourse({
+        title: courseData.title.trim(),
+        description: courseData.description.trim(),
+      })
+      await publishCoachCourse(course.id)
+      toast.success("Курс опубликован")
+      router.push("/coach/courses")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Ошибка публикации")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const addTag = () => {
     if (newTag.trim() && !courseData.tags.includes(newTag.trim())) {
@@ -577,17 +623,17 @@ export default function CreateCoursePage() {
 
               {/* Action Buttons */}
               <div className="flex justify-between items-center mt-8 pt-6 border-t">
-                <Button variant="outline">
+                <Button variant="outline" onClick={handleSaveDraft} disabled={saving}>
                   <Save className="w-4 h-4 mr-2" />
-                  Сохранить как черновик
+                  {saving ? "Сохранение..." : "Сохранить как черновик"}
                 </Button>
-                <div className="flex gap-3">
-                  <Button variant="outline">
-                    <Eye className="w-4 h-4 mr-2" />
-                    Предварительный просмотр
-                  </Button>
-                  <Button className="bg-purple-600 hover:bg-purple-700">Опубликовать курс</Button>
-                </div>
+                <Button
+                  className="bg-purple-600 hover:bg-purple-700"
+                  onClick={handlePublish}
+                  disabled={saving}
+                >
+                  {saving ? "Публикация..." : "Опубликовать курс"}
+                </Button>
               </div>
             </CardContent>
           </Card>

@@ -31,13 +31,16 @@ export function normalizeMeResponse(data: MeResponse): UserProfile {
 }
 
 export function normalizeMessage(msg: Message, currentUserId?: string): ChatMessage {
+  const deleted = Boolean(msg.deleted_at)
   return {
     id: msg.id,
     chat_id: msg.chat_id,
     sender_id: msg.sender_user_id ?? "",
-    content: msg.body,
+    content: deleted ? "Сообщение удалено" : msg.body,
     created_at: msg.created_at,
     is_read: currentUserId ? msg.sender_user_id === currentUserId : false,
+    deleted_at: msg.deleted_at ?? null,
+    edited_at: msg.edited_at ?? null,
   }
 }
 

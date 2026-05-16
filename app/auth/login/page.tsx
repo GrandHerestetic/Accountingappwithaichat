@@ -12,6 +12,7 @@ import { Eye, EyeOff, Briefcase, BookOpen, Settings } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -28,7 +29,7 @@ export default function LoginPage() {
   const handleLogin = async (userType: string) => {
     // Простая валидация
     if (!formData.email || !formData.password) {
-      alert("Пожалуйста, заполните все поля")
+      toast.error("Пожалуйста, заполните все поля")
       return
     }
 
@@ -45,7 +46,7 @@ export default function LoginPage() {
       router.push(redirectPath)
     } catch (error) {
       console.error("Login error:", error)
-      alert(error instanceof Error ? error.message : "Ошибка входа. Попробуйте еще раз.")
+      toast.error(error instanceof Error ? error.message : "Ошибка входа. Попробуйте еще раз.")
     } finally {
       setIsLoading(false)
     }
@@ -277,25 +278,6 @@ export default function LoginPage() {
               политикой конфиденциальности
             </Link>
           </p>
-        </div>
-
-        <div className="mt-8 p-4 bg-white/80 rounded-lg border">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Демо аккаунты:</h3>
-          <div className="text-xs text-gray-600 space-y-1">
-            <p>
-              <strong>Клиент:</strong> Иван Петров (ivan.petrov@company.kz)
-            </p>
-            <p>
-              <strong>Исполнитель:</strong> Анна Смирнова (anna.smirnova@buhgalter.kz)
-            </p>
-            <p>
-              <strong>Коуч:</strong> Елена Коучева (elena.koucheva@business.kz)
-            </p>
-            <p>
-              <strong>Админ:</strong> Администратор (admin@buhpro.kz)
-            </p>
-            <p className="text-blue-600 mt-2">Используйте реальные учетные данные из бэкенда</p>
-          </div>
         </div>
       </div>
     </div>

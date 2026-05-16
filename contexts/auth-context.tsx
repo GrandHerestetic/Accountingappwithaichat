@@ -1,9 +1,9 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { apiRequest, setAccessToken } from "@/lib/api-client"
-import { getMe } from "@/lib/api"
-import type { LoginRequest, RegisterRequest, AuthResponse, UserProfile } from "@/lib/api/types"
+import { setAccessToken } from "@/lib/api-client"
+import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister } from "@/lib/api"
+import type { LoginRequest, RegisterRequest, UserProfile } from "@/lib/api/types"
 
 interface AuthContextType {
   user: UserProfile | null
@@ -68,10 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = async (credentials: LoginRequest): Promise<void> => {
-    const auth = await apiRequest<AuthResponse>("/api/v1/auth/login", {
-      method: "POST",
-      body: JSON.stringify(credentials),
-    })
+    const auth = await apiLogin(credentials)
 
     storeTokens(auth.tokens)
     await refreshUser()
@@ -82,10 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null
 
     try {
-      await apiRequest<void>("/api/v1/auth/logout", {
-        method: "POST",
-        body: JSON.stringify({ refresh_token: storedRefreshToken }),
-      })
+      await apiLogout(storedRefreshToken)
     } catch (error) {
       console.error("Logout request error:", error)
     } finally {
@@ -99,10 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const register = async (payload: RegisterRequest): Promise<void> => {
-    const auth = await apiRequest<AuthResponse>("/api/v1/auth/register", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    })
+    const auth = await apiRegister(payload)
 
     storeTokens(auth.tokens)
     await refreshUser()

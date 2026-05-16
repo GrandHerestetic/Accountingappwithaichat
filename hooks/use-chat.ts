@@ -1,7 +1,12 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { listChatMessages, sendChatMessage } from "@/lib/api"
+import {
+  deleteChatMessage,
+  listChatMessages,
+  sendChatMessage,
+  updateChatMessage,
+} from "@/lib/api"
 import type { ChatMessage } from "@/lib/api/types"
 
 interface UseChatOptions {
@@ -53,9 +58,13 @@ export function useChat({ chatId, userId }: UseChatOptions) {
     }
   }, [chatId, userId])
 
-  const sendMessage = async (content: string) => {
-    if (content.length < 1 || content.length > 2000) {
-      throw new Error("Message must be 1-2000 characters")
+  const sendMessage = async (content: string, attachmentIds?: string[]) => {
+    const text = content.trim()
+    if (!text && !attachmentIds?.length) {
+      throw new Error("Введите текст или прикрепите файл")
+    }
+    if (text.length > 2000) {
+      throw new Error("Сообщение не более 2000 символов")
     }
 
     const tempId = `temp-${Date.now()}`
@@ -63,14 +72,21 @@ export function useChat({ chatId, userId }: UseChatOptions) {
       id: tempId,
       chat_id: chatId,
       sender_id: userId,
-      content,
+      content: text || "📎 Вложение",
       created_at: new Date().toISOString(),
       is_read: false,
     }
     setMessages((prev) => [...prev, tempMsg])
 
     try {
-      const msg = await sendChatMessage(chatId, content)
+      const msg = await sendChatMessage(
+        chatId,
+        {
+          ...(text ? { text } : {}),
+          ...(attachmentIds?.length ? { attachment_ids: attachmentIds } : {}),
+        },
+        userId
+      )
       setMessages((prev) => [...prev.filter((m) => m.id !== tempId), msg])
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m.id !== tempId))
@@ -78,9 +94,43 @@ export function useChat({ chatId, userId }: UseChatOptions) {
     }
   }
 
+  const editMessage = async (messageId: string, text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed || trimmed.length > 2000) {
+      throw new Error("Текст сообщения: 1–2000 символов")
+    }
+    const msg = await updateChatMessage(chatId, messageId, trimmed, userId)
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? msg : m)))
+    return msg
+  }
+
+  const removeMessage = async (messageId: string) => {
+    await deleteChatMessage(chatId, messageId)
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              content: "Сообщение удалено",
+              deleted_at: new Date().toISOString(),
+            }
+          : m
+      )
+    )
+  }
+
   const handleTyping = async () => {
     // Backend has no typing endpoint; no-op
   }
 
-  return { messages, sendMessage, handleTyping, isConnected, error, reload: loadMessages }
+  return {
+    messages,
+    sendMessage,
+    editMessage,
+    removeMessage,
+    handleTyping,
+    isConnected,
+    error,
+    reload: loadMessages,
+  }
 }

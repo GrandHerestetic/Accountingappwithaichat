@@ -195,6 +195,13 @@ export interface ChatMessage {
   content: string
   created_at: string
   is_read: boolean
+  deleted_at?: string | null
+  edited_at?: string | null
+}
+
+export interface SendMessageRequest {
+  text?: string
+  attachment_ids?: string[]
 }
 
 // Notifications

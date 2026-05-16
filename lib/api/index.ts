@@ -442,16 +442,63 @@ export async function listChatMessages(
   }
 }
 
-export async function sendChatMessage(chatId: string, text: string): Promise<import("./types").ChatMessage> {
+export async function sendChatMessage(
+  chatId: string,
+  body: import("./types").SendMessageRequest | string,
+  currentUserId?: string
+): Promise<import("./types").ChatMessage> {
+  const payload = typeof body === "string" ? { text: body } : body
   const msg = await apiRequest<import("./types").Message>(`/api/v1/my/chats/${chatId}/messages`, {
     method: "POST",
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(payload),
   })
-  return normalizeMessage(msg)
+  return normalizeMessage(msg, currentUserId)
+}
+
+export async function updateChatMessage(
+  chatId: string,
+  messageId: string,
+  text: string,
+  currentUserId?: string
+): Promise<import("./types").ChatMessage> {
+  const msg = await apiRequest<import("./types").Message>(
+    `/api/v1/my/chats/${chatId}/messages/${messageId}`,
+    { method: "PATCH", body: JSON.stringify({ text }) }
+  )
+  return normalizeMessage(msg, currentUserId)
+}
+
+export async function deleteChatMessage(chatId: string, messageId: string): Promise<void> {
+  await apiRequest(`/api/v1/my/chats/${chatId}/messages/${messageId}`, { method: "DELETE" })
 }
 
 export async function markChatRead(chatId: string): Promise<void> {
   return apiRequest(`/api/v1/my/chats/${chatId}/read`, { method: "POST" })
+}
+
+// ─── Auth (public) ────────────────────────────────────────────────────────────
+
+export async function login(body: import("./types").LoginRequest): Promise<import("./types").AuthResponse> {
+  return apiRequest<import("./types").AuthResponse>("/api/v1/auth/login", {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
+}
+
+export async function register(
+  body: import("./types").RegisterRequest
+): Promise<import("./types").AuthResponse> {
+  return apiRequest<import("./types").AuthResponse>("/api/v1/auth/register", {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
+}
+
+export async function logout(refreshToken: string | null): Promise<void> {
+  await apiRequest<void>("/api/v1/auth/logout", {
+    method: "POST",
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  })
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

@@ -144,6 +144,20 @@ export default function ExecutorResponsesPage() {
   }
 
   // ── Req 4.4: submit draft response for payment ────────────────────────────
+  const handleCancelResponse = async (response: OrderResponse) => {
+    if (!confirm("Отменить черновик отклика?")) return
+    setSubmittingId(response.id)
+    try {
+      await cancelMyResponse(response.order_id, response.id)
+      toast.success("Отклик отменён")
+      await fetchResponses()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Не удалось отменить отклик")
+    } finally {
+      setSubmittingId(null)
+    }
+  }
+
   const handleSubmitForPayment = async (response: OrderResponse) => {
     setSubmittingId(response.id)
     try {
@@ -258,6 +272,14 @@ export default function ExecutorResponsesPage() {
                                 >
                                   <Send className="w-4 h-4 mr-2" />
                                   {submittingId === response.id ? "Отправка..." : "Отправить"}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  className="w-full text-red-600"
+                                  onClick={() => handleCancelResponse(response)}
+                                  disabled={submittingId === response.id}
+                                >
+                                  Отменить черновик
                                 </Button>
                               </>
                             )}

@@ -26,7 +26,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { apiRequest } from "@/lib/api-client"
+import { listMyNotifications, markNotificationRead } from "@/lib/api"
 import { useAuth } from "@/contexts/auth-context"
 import { useNotificationsPolling } from "@/hooks/use-notifications-polling"
 import type { Notification, NotificationType, PaginatedResponse } from "@/lib/api/types"
@@ -104,9 +104,7 @@ export function NotificationsDropdown() {
   const fetchRecent = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await apiRequest<PaginatedResponse<Notification>>(
-        "/api/v1/my/notifications?page=1&page_size=5"
-      )
+      const data = await listMyNotifications({ page: 1, pageSize: 5 })
       setNotifications(data.items)
     } catch {
       // Silently ignore — badge count from polling is still shown
@@ -134,7 +132,7 @@ export function NotificationsDropdown() {
     )
 
     try {
-      await apiRequest(`/api/v1/my/notifications/${notification.id}/read`, { method: "POST" })
+      await markNotificationRead(notification.id)
     } catch (err) {
       // Revert
       setNotifications((ns) =>
