@@ -1,3 +1,4 @@
+import { extractTokenPair } from "./auth-tokens"
 import { ApiError, ApiErrorResponse } from "./api/types"
 
 // ---------------------------------------------------------------------------
@@ -56,16 +57,16 @@ export async function refreshAccessToken(): Promise<string | null> {
         return null
       }
 
-      const data = (await response.json()) as {
-        access_token?: string
-        refresh_token?: string
+      const data = await response.json()
+      const tokens = extractTokenPair(data)
+      if (!tokens) {
+        return null
       }
-      const newToken = data.access_token ?? null
-      setAccessToken(newToken)
-      if (data.refresh_token && typeof window !== "undefined") {
-        localStorage.setItem("refresh_token", data.refresh_token)
+      setAccessToken(tokens.access_token)
+      if (typeof window !== "undefined") {
+        localStorage.setItem("refresh_token", tokens.refresh_token)
       }
-      return newToken
+      return tokens.access_token
     } catch {
       return null
     } finally {
@@ -80,7 +81,8 @@ export async function refreshAccessToken(): Promise<string | null> {
 // Helper: build headers with optional Authorization
 // ---------------------------------------------------------------------------
 function buildHeaders(init?: RequestInit, json = true): HeadersInit {
-  const token = getAccessToken()
+  const raw = getAccessToken()
+  const token = raw && raw !== "undefined" ? raw : null
   const headers: Record<string, string> = {
     ...(init?.headers as Record<string, string> | undefined),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),

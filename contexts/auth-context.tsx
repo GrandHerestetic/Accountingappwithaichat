@@ -1,7 +1,8 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { setAccessToken } from "@/lib/api-client"
+import { refreshAccessToken } from "@/lib/api-client"
+import { clearPersistedTokens, extractTokenPair, persistTokens } from "@/lib/auth-tokens"
 import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister } from "@/lib/api"
 import type { LoginRequest, RegisterRequest, UserProfile } from "@/lib/api/types"
 
@@ -16,13 +17,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
-function storeTokens(tokens: { access_token: string; refresh_token: string }) {
-  setAccessToken(tokens.access_token)
-  if (typeof window !== "undefined") {
-    localStorage.setItem("refresh_token", tokens.refresh_token)
-  }
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null)
@@ -43,22 +37,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!storedRefreshToken) return
 
-        try {
-          await refreshUser()
-        } catch {
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("refresh_token")
-          }
-          setAccessToken(null)
-          setIsAuthenticated(false)
+        const access = await refreshAccessToken()
+        if (!access) {
+          clearPersistedTokens()
+          return
         }
+
+        await refreshUser()
       } catch (error) {
         console.error("Error restoring auth session:", error)
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("refresh_token")
-        }
-        setAccessToken(null)
+        clearPersistedTokens()
         setIsAuthenticated(false)
+        setUser(null)
       } finally {
         setIsLoading(false)
       }
@@ -69,8 +59,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (credentials: LoginRequest): Promise<void> => {
     const auth = await apiLogin(credentials)
+    const tokens = extractTokenPair(auth)
+    if (!tokens) {
+      throw new Error("Сервер не вернул токены авторизации")
+    }
 
-    storeTokens(auth.tokens)
+    persistTokens(tokens)
     await refreshUser()
   }
 
@@ -83,10 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Logout request error:", error)
     } finally {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("refresh_token")
-      }
-      setAccessToken(null)
+      clearPersistedTokens()
       setUser(null)
       setIsAuthenticated(false)
     }
@@ -94,8 +85,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (payload: RegisterRequest): Promise<void> => {
     const auth = await apiRegister(payload)
+    const tokens = extractTokenPair(auth)
+    if (!tokens) {
+      throw new Error("Сервер не вернул токены авторизации")
+    }
 
-    storeTokens(auth.tokens)
+    persistTokens(tokens)
     await refreshUser()
   }
 
