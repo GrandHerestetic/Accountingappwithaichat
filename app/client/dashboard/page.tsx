@@ -53,6 +53,7 @@ const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
   in_progress: "bg-orange-100 text-orange-700",
   completed: "bg-green-100 text-green-700",
   cancelled: "bg-red-100 text-red-700",
+  archived: "bg-slate-100 text-slate-700",
 }
 
 const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
@@ -62,6 +63,7 @@ const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   in_progress: "В работе",
   completed: "Завершён",
   cancelled: "Отменён",
+  archived: "В архиве",
 }
 
 // ─── Edit dialog state ───────────────────────────────────────────────────────

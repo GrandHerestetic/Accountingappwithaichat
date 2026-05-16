@@ -16,6 +16,7 @@ import { toast } from "sonner"
 export default function CoachRegister() {
   const [step, setStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
+  const [password, setPassword] = useState("")
   const [formData, setFormData] = useState({
     personalInfo: {
       firstName: "",
@@ -53,15 +54,34 @@ export default function CoachRegister() {
       toast.error("Укажите email")
       return
     }
+    if (!password || password.length < 8) {
+      toast.error("Пароль должен быть не менее 8 символов")
+      return
+    }
 
     setIsLoading(true)
 
     try {
+      const aboutParts = [
+        formData.professional.description,
+        formData.professional.education,
+        formData.professional.achievements,
+        formData.professional.methodology,
+      ].filter(Boolean)
       await register({
         email: formData.personalInfo.email.trim(),
-        password: "TempPass123",
+        password,
         role: "coach",
         profile_name: `${formData.personalInfo.firstName} ${formData.personalInfo.lastName}`.trim() || "Новый коуч",
+        phone: formData.personalInfo.phone || undefined,
+        first_name: formData.personalInfo.firstName || undefined,
+        last_name: formData.personalInfo.lastName || undefined,
+        experience_level: formData.personalInfo.experience || undefined,
+        specializations: formData.personalInfo.specialization
+          ? [formData.personalInfo.specialization]
+          : undefined,
+        education: formData.professional.education || undefined,
+        about: aboutParts.join("\n\n") || undefined,
       })
 
       // Перенаправление в личный кабинет
@@ -291,6 +311,17 @@ export default function CoachRegister() {
                         professional: { ...formData.professional, description: e.target.value },
                       })
                     }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Пароль *</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Минимум 8 символов"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
 

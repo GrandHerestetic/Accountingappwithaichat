@@ -9,6 +9,24 @@ export interface RegisterRequest {
   password: string
   role: "client" | "executor" | "coach"
   profile_name: string
+  phone?: string
+  client_type?: string
+  tax_number?: string
+  contact_name?: string
+  contact_position?: string
+  address?: string
+  about?: string
+  website?: string
+  first_name?: string
+  last_name?: string
+  middle_name?: string
+  iin?: string
+  city?: string
+  experience_level?: string
+  specializations?: string[]
+  education?: string
+  work_format?: string
+  hourly_rate?: number
 }
 
 export interface TokenPair {
@@ -133,7 +151,7 @@ export interface OrderResponse {
   order_id: string
   executor_id: string
   proposed_amount: number
-  proposed_deadline: string
+  proposed_deadline?: string
   cover_letter: string
   status: ResponseStatus
   is_paid?: boolean

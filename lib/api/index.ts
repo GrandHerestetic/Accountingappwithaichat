@@ -133,7 +133,11 @@ export async function updateMyOrder(id: string, body: UpdateOrderRequest): Promi
 }
 
 export async function submitMyOrder(id: string): Promise<{ checkout_url?: string }> {
-  return apiRequest(`/api/v1/orders/my/${id}/submit`, { method: "POST" })
+  const data = await apiRequest<{
+    checkout_url?: string
+    payment?: { checkout_url?: string }
+  }>(`/api/v1/orders/my/${id}/submit`, { method: "POST" })
+  return { checkout_url: data.checkout_url ?? data.payment?.checkout_url }
 }
 
 export async function cancelMyOrder(id: string): Promise<void> {
@@ -207,13 +211,23 @@ export async function listMyResponses(params?: ListParams): Promise<PaginatedRes
   )
 }
 
+function toISODeadline(deadline: string): string {
+  const trimmed = deadline.trim()
+  if (!trimmed) return trimmed
+  if (trimmed.includes("T")) return trimmed
+  return `${trimmed}T12:00:00.000Z`
+}
+
 export async function createOrderResponse(
   orderId: string,
   body: { proposed_amount: number; proposed_deadline: string; cover_letter: string }
 ): Promise<{ id: string; status: string }> {
   return apiRequest(`/api/v1/orders/${orderId}/responses`, {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      ...body,
+      proposed_deadline: toISODeadline(body.proposed_deadline),
+    }),
   })
 }
 
@@ -222,9 +236,13 @@ export async function updateMyResponse(
   responseId: string,
   body: UpdateResponseRequest
 ): Promise<OrderResponse> {
+  const payload = { ...body }
+  if (typeof payload.proposed_deadline === "string") {
+    payload.proposed_deadline = toISODeadline(payload.proposed_deadline)
+  }
   return apiRequest(`/api/v1/orders/${orderId}/responses/my/${responseId}`, {
     method: "PATCH",
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   })
 }
 
@@ -232,7 +250,11 @@ export async function submitMyResponse(
   orderId: string,
   responseId: string
 ): Promise<{ checkout_url?: string }> {
-  return apiRequest(`/api/v1/orders/${orderId}/responses/my/${responseId}/submit`, { method: "POST" })
+  const data = await apiRequest<{
+    checkout_url?: string
+    payment?: { checkout_url?: string }
+  }>(`/api/v1/orders/${orderId}/responses/my/${responseId}/submit`, { method: "POST" })
+  return { checkout_url: data.checkout_url ?? data.payment?.checkout_url }
 }
 
 export async function cancelMyResponse(orderId: string, responseId: string): Promise<void> {

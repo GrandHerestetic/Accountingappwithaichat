@@ -6,15 +6,28 @@ import type {
   UserProfile,
 } from "./types"
 
-export function normalizeMeResponse(data: MeResponse): UserProfile {
-  const profile = data.profile ?? {}
+/** Supports nested `{ user, profile }` and flat `/auth/me` payloads. */
+export function normalizeMeResponse(data: MeResponse | Record<string, unknown>): UserProfile {
+  const root = data as Record<string, unknown>
+  const nested = root.user as MeResponse["user"] | undefined
+  const user =
+    nested ??
+    ({
+      id: String(root.id ?? ""),
+      email: String(root.email ?? ""),
+      role: root.role as UserProfile["role"],
+      is_active: root.is_active as boolean | undefined,
+      created_at: root.created_at as string | undefined,
+      verification_status: root.verification_status as UserProfile["verification_status"],
+    } satisfies MeResponse["user"])
+  const profile = (root.profile ?? {}) as Record<string, unknown>
   return {
-    id: data.user.id,
-    email: data.user.email,
-    role: data.user.role,
-    is_active: data.user.is_active,
-    created_at: data.user.created_at,
-    verification_status: data.user.verification_status,
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    is_active: user.is_active,
+    created_at: user.created_at,
+    verification_status: user.verification_status,
     profile: {
       profile_name:
         (profile.display_name as string) ??

@@ -73,7 +73,7 @@ export default function ExecutorOrders() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100">
-      <Navigation userType="executor" userName={user?.profile?.profile_name ?? user?.email ?? ""} notifications={0} />
+      <Navigation />
 
       <main className="py-8">
         <div className="container mx-auto px-4 max-w-6xl">

@@ -98,7 +98,7 @@ export default function ExecutorResponsesPage() {
       open: true,
       response,
       amount: String(response.proposed_amount),
-      deadline: response.proposed_deadline.split("T")[0], // ISO date only
+      deadline: response.proposed_deadline?.split("T")[0] ?? "",
       coverLetter: response.cover_letter,
     })
   }
@@ -116,7 +116,10 @@ export default function ExecutorResponsesPage() {
     if (!isNaN(amountNum) && amountNum !== editState.response.proposed_amount) {
       patch.proposed_amount = amountNum
     }
-    if (editState.deadline && editState.deadline !== editState.response.proposed_deadline.split("T")[0]) {
+    if (
+      editState.deadline &&
+      editState.deadline !== (editState.response.proposed_deadline?.split("T")[0] ?? "")
+    ) {
       patch.proposed_deadline = editState.deadline
     }
     if (editState.coverLetter.trim() !== editState.response.cover_letter) {
@@ -239,7 +242,9 @@ export default function ExecutorResponsesPage() {
                               <div>
                                 <span className="text-gray-500">Срок выполнения:</span>
                                 <p className="font-medium">
-                                  {new Date(response.proposed_deadline).toLocaleDateString("ru-RU")}
+                                  {response.proposed_deadline
+                                    ? new Date(response.proposed_deadline).toLocaleDateString("ru-RU")
+                                    : "—"}
                                 </p>
                               </div>
                             </div>

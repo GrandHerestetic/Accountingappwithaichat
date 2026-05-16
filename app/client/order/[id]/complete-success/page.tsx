@@ -15,7 +15,7 @@ export default function OrderCompleteSuccessPage({ params }: { params: { id: str
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <Navigation userType="client" userName="Иван Петров" notifications={5} />
+      <Navigation />
 
       <main className="py-16">
         <div className="container mx-auto px-4 max-w-2xl">

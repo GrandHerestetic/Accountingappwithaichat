@@ -45,7 +45,9 @@ export default function CoursesPage() {
   // Client-side filtering and sorting
   // ---------------------------------------------------------------------------
   const categories = useMemo(() => {
-    const cats = Array.from(new Set(courses.map((c) => c.category)))
+    const cats = Array.from(
+      new Set(courses.map((c) => c.category).filter((c): c is string => Boolean(c)))
+    )
     return cats.sort()
   }, [courses])
 
@@ -57,8 +59,8 @@ export default function CoursesPage() {
       filtered = filtered.filter(
         (c) =>
           c.title.toLowerCase().includes(q) ||
-          c.description.toLowerCase().includes(q) ||
-          c.category.toLowerCase().includes(q)
+          (c.description ?? "").toLowerCase().includes(q) ||
+          (c.category ?? "").toLowerCase().includes(q)
       )
     }
 
@@ -222,7 +224,7 @@ export default function CoursesPage() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2 mb-2">
                     <Badge variant="outline" className="text-xs">
-                      {course.category}
+                      {course.category ?? "Без категории"}
                     </Badge>
                   </div>
                   <h3 className="font-semibold text-lg line-clamp-2 group-hover:text-blue-600 transition-colors">

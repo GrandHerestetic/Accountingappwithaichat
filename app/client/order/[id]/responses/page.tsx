@@ -136,7 +136,9 @@ export default function OrderResponses({ params }: { params: { id: string } }) {
                       <div>
                         <span className="text-gray-500">Срок выполнения:</span>
                         <p className="font-medium">
-                          {new Date(response.proposed_deadline).toLocaleDateString("ru-RU")}
+                          {response.proposed_deadline
+                            ? new Date(response.proposed_deadline).toLocaleDateString("ru-RU")
+                            : "—"}
                         </p>
                       </div>
                     </div>

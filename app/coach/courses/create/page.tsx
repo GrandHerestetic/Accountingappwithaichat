@@ -31,6 +31,21 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { createCoachCourse, publishCoachCourse } from "@/lib/api"
 
+type CourseLesson = {
+  id: number
+  title: string
+  type: string
+  content: string
+  duration: string
+}
+
+type CourseModule = {
+  id: number
+  title: string
+  description: string
+  lessons: CourseLesson[]
+}
+
 export default function CreateCoursePage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
@@ -43,14 +58,14 @@ export default function CreateCoursePage() {
     price: "",
     duration: "",
     language: "ru",
-    tags: [],
+    tags: [] as string[],
     isFree: false,
     hasCertificate: true,
     modules: [],
   })
 
   const [newTag, setNewTag] = useState("")
-  const [modules, setModules] = useState([
+  const [modules, setModules] = useState<CourseModule[]>([
     {
       id: 1,
       title: "",
@@ -123,7 +138,7 @@ export default function CreateCoursePage() {
     }
   }
 
-  const removeTag = (tagToRemove) => {
+  const removeTag = (tagToRemove: string) => {
     setCourseData({
       ...courseData,
       tags: courseData.tags.filter((tag) => tag !== tagToRemove),
@@ -142,7 +157,7 @@ export default function CreateCoursePage() {
     ])
   }
 
-  const addLesson = (moduleId) => {
+  const addLesson = (moduleId: number) => {
     setModules(
       modules.map((module) =>
         module.id === moduleId

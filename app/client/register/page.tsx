@@ -76,6 +76,13 @@ export default function ClientRegister() {
         password,
         role: "client",
         profile_name: formData.contactPerson || formData.companyName || "Новый клиент",
+        phone: formData.phone || undefined,
+        client_type: formData.clientType || clientType || undefined,
+        tax_number: formData.bin || undefined,
+        contact_name: formData.contactPerson || undefined,
+        contact_position: formData.position || undefined,
+        address: formData.address || undefined,
+        about: formData.description || undefined,
       })
 
       const me = await getMe()

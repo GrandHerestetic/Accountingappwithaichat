@@ -250,9 +250,9 @@ export default function LoginPage() {
             </div>
 
             <div className="mt-6 text-center space-y-2">
-              <Link href="/auth/forgot-password" className="text-sm text-blue-600 hover:underline">
+              {/* <Link href="/auth/forgot-password" className="text-sm text-blue-600 hover:underline">
                 Забыли пароль?
-              </Link>
+              </Link> */}
               <div className="text-sm text-gray-600">
                 Нет аккаунта?{" "}
                 <Link href="/client/register" className="text-blue-600 hover:underline">

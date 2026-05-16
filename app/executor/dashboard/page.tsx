@@ -210,7 +210,10 @@ export default function ExecutorDashboard() {
                             </div>
                             <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
                               <Calendar className="w-4 h-4" />
-                              Срок: {new Date(response.proposed_deadline).toLocaleDateString("ru-RU")}
+                              Срок:{" "}
+                              {response.proposed_deadline
+                                ? new Date(response.proposed_deadline).toLocaleDateString("ru-RU")
+                                : "—"}
                             </div>
                           </CardContent>
                         </Card>
