@@ -216,10 +216,6 @@ export default function HomePage() {
                   <CardContent>
                     <div className="flex items-center justify-between">
                       <span className="text-lg font-semibold text-blue-600">{service.price}</span>
-                      <Button size="sm" variant="ghost" className="text-blue-600 hover:text-blue-700">
-                        Подробнее
-                        <ArrowRight className="ml-1 w-3 h-3" />
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>
