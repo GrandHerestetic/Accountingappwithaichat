@@ -8,7 +8,7 @@ import { ApiError, ApiErrorResponse } from "./api/types"
 const API_BASE_URL =
   typeof window !== "undefined"
     ? ""
-    : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8082")
+    : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080")
 
 // ---------------------------------------------------------------------------
 // Module-level access token (in-memory only — never persisted to localStorage)

@@ -4,8 +4,7 @@ import { Navigation } from "@/components/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Target, Users, Award, Heart, Lightbulb, Shield, Globe, TrendingUp } from "lucide-react"
+import { Target, Heart, Lightbulb, Globe } from "lucide-react"
 import Link from "next/link"
 
 export default function AboutPage() {
@@ -30,63 +29,6 @@ export default function AboutPage() {
     },
   ]
 
-  const stats = [
-    { number: "2019", label: "Год основания" },
-    { number: "5000+", label: "Активных пользователей" },
-    { number: "1200+", label: "Выполненных проектов" },
-    { number: "50+", label: "Городов присутствия" },
-  ]
-
-  const team = [
-    {
-      name: "Алексей Петров",
-      role: "CEO & Основатель",
-      description: "15+ лет опыта в IT и управлении проектами",
-      avatar: "/placeholder.svg?height=100&width=100&text=АП",
-    },
-    {
-      name: "Мария Сидорова",
-      role: "CTO",
-      description: "Эксперт в области разработки и архитектуры систем",
-      avatar: "/placeholder.svg?height=100&width=100&text=МС",
-    },
-    {
-      name: "Дмитрий Козлов",
-      role: "Head of Product",
-      description: "Специалист по пользовательскому опыту и продуктовой стратегии",
-      avatar: "/placeholder.svg?height=100&width=100&text=ДК",
-    },
-    {
-      name: "Анна Волкова",
-      role: "Head of Marketing",
-      description: "Эксперт в области цифрового маркетинга и развития бренда",
-      avatar: "/placeholder.svg?height=100&width=100&text=АВ",
-    },
-  ]
-
-  const achievements = [
-    {
-      icon: Award,
-      title: "Лучшая платформа фриланса 2023",
-      description: "По версии Russian Freelance Awards",
-    },
-    {
-      icon: Shield,
-      title: "Сертификат безопасности",
-      description: "ISO 27001 для защиты данных пользователей",
-    },
-    {
-      icon: Users,
-      title: "Топ-3 по популярности",
-      description: "Среди платформ фриланса в России",
-    },
-    {
-      icon: TrendingUp,
-      title: "Рост 300% в год",
-      description: "Количество активных пользователей",
-    },
-  ]
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <Navigation />
@@ -102,18 +44,6 @@ export default function AboutPage() {
             BuhPro — это современная платформа, которая объединяет талантливых исполнителей с амбициозными заказчиками
             для создания выдающихся проектов
           </p>
-        </div>
-
-        {/* Stats Section */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-16">
-          {stats.map((stat, index) => (
-            <Card key={index} className="text-center">
-              <CardContent className="pt-6">
-                <div className="text-3xl font-bold text-blue-600 mb-2">{stat.number}</div>
-                <div className="text-gray-600">{stat.label}</div>
-              </CardContent>
-            </Card>
-          ))}
         </div>
 
         {/* Values Section */}
@@ -154,56 +84,6 @@ export default function AboutPage() {
                 простых задач до масштабных корпоративных решений.
               </p>
             </div>
-          </div>
-        </div>
-
-        {/* Team Section */}
-        <div className="mb-16">
-          <h2 className="text-3xl font-bold text-center mb-8">Наша команда</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {team.map((member, index) => (
-              <Card key={index} className="text-center">
-                <CardHeader>
-                  <Avatar className="w-20 h-20 mx-auto mb-4">
-                    <AvatarImage src={member.avatar || "/placeholder.svg"} />
-                    <AvatarFallback>
-                      {member.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <CardTitle className="text-lg">{member.name}</CardTitle>
-                  <Badge variant="secondary" className="mb-2">
-                    {member.role}
-                  </Badge>
-                  <CardDescription className="text-sm">{member.description}</CardDescription>
-                </CardHeader>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* Achievements Section */}
-        <div className="mb-16">
-          <h2 className="text-3xl font-bold text-center mb-8">Наши достижения</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {achievements.map((achievement, index) => {
-              const Icon = achievement.icon
-              return (
-                <Card key={index}>
-                  <CardContent className="flex items-center p-6">
-                    <div className="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4">
-                      <Icon className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold mb-1">{achievement.title}</h3>
-                      <p className="text-gray-600 text-sm">{achievement.description}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
           </div>
         </div>
 

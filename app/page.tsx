@@ -1,7 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { listCourses, listOrders } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -18,13 +20,26 @@ import {
   FileText,
   PieChart,
   Briefcase,
-  MessageCircle,
-  Phone,
-  Mail,
 } from "lucide-react"
 
 export default function HomePage() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
+  const [platformStats, setPlatformStats] = useState<{ label: string; value: string }[]>([])
+
+  useEffect(() => {
+    Promise.all([
+      listOrders({ page: 1, pageSize: 1 }),
+      listCourses({ page: 1, pageSize: 1 }),
+    ])
+      .then(([orders, courses]) => {
+        setPlatformStats([
+          { label: "Заказов на платформе", value: String(orders.total) },
+          { label: "Курсов в каталоге", value: String(courses.total) },
+        ])
+      })
+      .catch(() => setPlatformStats([]))
+  }, [])
 
   const features = [
     {
@@ -54,60 +69,32 @@ export default function HomePage() {
       icon: Calculator,
       title: "Ведение учета",
       description: "Полное ведение бухгалтерского учета для ИП и ООО",
-      price: "от 15,000 ₸/мес",
       popular: true,
     },
     {
       icon: FileText,
       title: "Подготовка отчетности",
       description: "Составление и подача налоговых деклараций и отчетов",
-      price: "от 8,000 ₸",
       popular: false,
     },
     {
       icon: PieChart,
       title: "Налоговое планирование",
       description: "Оптимизация налогообложения и консультации",
-      price: "от 12,000 ₸",
       popular: false,
     },
     {
       icon: Briefcase,
       title: "Регистрация бизнеса",
       description: "Помощь в регистрации ИП и ООО, получении лицензий",
-      price: "от 25,000 ₸",
       popular: false,
     },
   ]
 
-  const stats = [
-    { label: "Активных исполнителей", value: "2,500+" },
-    { label: "Выполненных заказов", value: "15,000+" },
-    { label: "Довольных клиентов", value: "8,500+" },
-    { label: "Средний рейтинг", value: "4.8/5" },
-  ]
-
-  const testimonials = [
-    {
-      name: "Анна Петрова",
-      role: "ИП",
-      content:
-        "Отличная платформа! Нашла надежного бухгалтера за один день. Все документы оформлены качественно и в срок.",
-      rating: 5,
-    },
-    {
-      name: "Максим Иванов",
-      role: "Директор ООО",
-      content: "Пользуюсь BuhPro уже год. Очень удобно находить специалистов для разовых задач. Рекомендую!",
-      rating: 5,
-    },
-    {
-      name: "Елена Сидорова",
-      role: "Предприниматель",
-      content: "Система эскроу дает уверенность в безопасности сделок. Качество услуг всегда на высоте.",
-      rating: 5,
-    },
-  ]
+  const handleSearch = () => {
+    const q = searchQuery.trim()
+    router.push(q ? `/orders?q=${encodeURIComponent(q)}` : "/orders")
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -141,7 +128,11 @@ export default function HomePage() {
                     className="pl-10 h-12 text-base border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                   />
                 </div>
-                <Button size="lg" className="h-12 px-8 bg-blue-600 hover:bg-blue-700 text-white font-medium">
+                <Button
+                  size="lg"
+                  className="h-12 px-8 bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                  onClick={handleSearch}
+                >
                   Найти
                   <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
@@ -169,19 +160,20 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-12 md:py-16 bg-white border-t border-gray-100">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
-            {stats.map((stat, index) => (
-              <div key={index} className="text-center">
-                <div className="text-2xl md:text-3xl font-bold text-blue-600 mb-2">{stat.value}</div>
-                <div className="text-sm md:text-base text-gray-600">{stat.label}</div>
-              </div>
-            ))}
+      {platformStats.length > 0 && (
+        <section className="py-12 md:py-16 bg-white border-t border-gray-100">
+          <div className="container mx-auto px-4">
+            <div className="grid grid-cols-2 gap-6 md:gap-8 max-w-lg mx-auto">
+              {platformStats.map((stat) => (
+                <div key={stat.label} className="text-center">
+                  <div className="text-2xl md:text-3xl font-bold text-blue-600 mb-2">{stat.value}</div>
+                  <div className="text-sm md:text-base text-gray-600">{stat.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Services Section */}
       <section className="py-12 md:py-20 bg-gray-50">
@@ -197,9 +189,9 @@ export default function HomePage() {
             {services.map((service, index) => {
               const Icon = service.icon
               return (
+                <Link key={index} href="/orders">
                 <Card
-                  key={index}
-                  className={`relative hover:shadow-lg transition-all duration-300 cursor-pointer group ${
+                  className={`relative hover:shadow-lg transition-all duration-300 cursor-pointer group h-full ${
                     service.popular ? "ring-2 ring-blue-500 shadow-lg" : ""
                   }`}
                 >
@@ -214,11 +206,10 @@ export default function HomePage() {
                     <CardDescription className="text-sm">{service.description}</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center justify-between">
-                      <span className="text-lg font-semibold text-blue-600">{service.price}</span>
-                    </div>
+                    <span className="text-sm text-blue-600 font-medium">Смотреть заказы →</span>
                   </CardContent>
                 </Card>
+                </Link>
               )
             })}
           </div>
@@ -252,46 +243,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section className="py-12 md:py-20 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-4xl font-bold text-gray-900 mb-4">Отзывы клиентов</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Узнайте, что говорят о нас предприниматели и владельцы бизнеса
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <Card key={index} className="hover:shadow-lg transition-shadow duration-300">
-                <CardContent className="p-6">
-                  <div className="flex items-center mb-4">
-                    {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                    ))}
-                  </div>
-                  <p className="text-gray-700 mb-4 leading-relaxed">"{testimonial.content}"</p>
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                      <span className="text-blue-600 font-semibold text-sm">
-                        {testimonial.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </span>
-                    </div>
-                    <div>
-                      <div className="font-semibold text-gray-900">{testimonial.name}</div>
-                      <div className="text-sm text-gray-600">{testimonial.role}</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* CTA Section */}
       <section className="py-12 md:py-20 bg-blue-600">
@@ -333,17 +284,9 @@ export default function HomePage() {
               <p className="text-gray-400 mb-4">
                 Платформа для поиска квалифицированных бухгалтеров и финансовых консультантов.
               </p>
-              <div className="flex space-x-4">
-                <Button size="sm" variant="ghost" className="text-gray-400 hover:text-white p-2">
-                  <MessageCircle className="w-5 h-5" />
-                </Button>
-                <Button size="sm" variant="ghost" className="text-gray-400 hover:text-white p-2">
-                  <Phone className="w-5 h-5" />
-                </Button>
-                <Button size="sm" variant="ghost" className="text-gray-400 hover:text-white p-2">
-                  <Mail className="w-5 h-5" />
-                </Button>
-              </div>
+              <Link href="/support" className="text-gray-400 hover:text-white text-sm">
+                Связаться с поддержкой
+              </Link>
             </div>
 
             <div>

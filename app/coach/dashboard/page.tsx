@@ -18,51 +18,20 @@ export default function CoachDashboard() {
   const { data: coursesData } = useCoachCourses({ page: 1, pageSize: 50 })
   const apiCourses = coursesData?.items ?? []
 
+  const publishedCount = apiCourses.filter((c) => c.status === "published").length
   const coachStats = {
     totalCourses: apiCourses.length,
-    totalStudents: 0,
-    completionRate: apiCourses.length
-      ? Math.round(
-          (apiCourses.filter((c) => c.status === "published").length / apiCourses.length) * 100
-        )
-      : 0,
-    totalRevenue: 0,
-    avgRating: 0,
-    certificatesIssued: 0,
+    publishedCourses: publishedCount,
+    completionRate: apiCourses.length ? Math.round((publishedCount / apiCourses.length) * 100) : 0,
   }
 
   const courses = apiCourses.map((c) => ({
     id: c.id,
     title: c.title,
     description: c.description ?? "",
-    students: 0,
-    rating: 0,
     status: c.status,
-    lessons: 0,
-    duration: "—",
-    price: "—",
-    completionRate: 0,
-    revenue: "—",
     lastUpdated: c.updated_at,
   }))
-
-  const recentActivity = [
-    {
-      type: "enrollment",
-      message: "Новый студент записался на курс 'Основы налогового учета'",
-      time: "2 часа назад",
-    },
-    {
-      type: "completion",
-      message: "Студент завершил курс 'МСФО для малого бизнеса'",
-      time: "5 часов назад",
-    },
-    {
-      type: "review",
-      message: "Получен новый отзыв (5 звезд) на курс 'Основы налогового учета'",
-      time: "1 день назад",
-    },
-  ]
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -126,8 +95,8 @@ export default function CoachDashboard() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Студентов</p>
-                      <p className="text-2xl font-bold text-gray-900">{coachStats.totalStudents}</p>
+                      <p className="text-sm font-medium text-gray-600">Опубликовано</p>
+                      <p className="text-2xl font-bold text-gray-900">{coachStats.publishedCourses}</p>
                     </div>
                     <div className="p-3 bg-blue-100 rounded-full">
                       <Users className="w-6 h-6 text-blue-600" />
@@ -154,8 +123,8 @@ export default function CoachDashboard() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Общий доход</p>
-                      <p className="text-2xl font-bold text-gray-900">{coachStats.totalRevenue.toLocaleString()} ₸</p>
+                      <p className="text-sm font-medium text-gray-600">Черновики</p>
+                      <p className="text-2xl font-bold text-gray-900">{coachStats.totalCourses - coachStats.publishedCourses}</p>
                     </div>
                     <div className="p-3 bg-yellow-100 rounded-full">
                       <Award className="w-6 h-6 text-yellow-600" />
@@ -189,40 +158,37 @@ export default function CoachDashboard() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                           <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Средний рейтинг:</span>
-                            <div className="flex items-center gap-1">
-                              <span className="font-bold">{coachStats.avgRating}</span>
-                              <Award className="w-4 h-4 text-yellow-500" />
-                            </div>
+                            <span className="text-sm text-gray-600">Всего курсов:</span>
+                            <span className="font-bold">{coachStats.totalCourses}</span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Выдано сертификатов:</span>
-                            <span className="font-bold">{coachStats.certificatesIssued}</span>
+                            <span className="text-sm text-gray-600">Опубликовано:</span>
+                            <span className="font-bold">{coachStats.publishedCourses}</span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Активных курсов:</span>
-                            <span className="font-bold">{courses.filter((c) => c.status === "published").length}</span>
+                            <span className="text-sm text-gray-600">Доля опубликованных:</span>
+                            <span className="font-bold">{coachStats.completionRate}%</span>
                           </div>
                         </CardContent>
                       </Card>
 
-                      {/* Recent Activity */}
                       <Card>
                         <CardHeader>
-                          <CardTitle className="text-lg">Последняя активность</CardTitle>
+                          <CardTitle className="text-lg">Быстрые действия</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            {recentActivity.map((activity, index) => (
-                              <div key={index} className="flex items-start gap-3">
-                                <div className="w-2 h-2 bg-purple-600 rounded-full mt-2"></div>
-                                <div className="flex-1">
-                                  <p className="text-sm">{activity.message}</p>
-                                  <p className="text-xs text-gray-500">{activity.time}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                        <CardContent className="space-y-3">
+                          <Link href="/coach/courses/create">
+                            <Button className="w-full bg-purple-600 hover:bg-purple-700">
+                              <Plus className="w-4 h-4 mr-2" />
+                              Создать курс
+                            </Button>
+                          </Link>
+                          <Link href="/coach/courses">
+                            <Button variant="outline" className="w-full">
+                              <FileText className="w-4 h-4 mr-2" />
+                              Все курсы
+                            </Button>
+                          </Link>
                         </CardContent>
                       </Card>
                     </div>
@@ -244,14 +210,7 @@ export default function CoachDashboard() {
                               >
                                 <div className="flex-1">
                                   <h4 className="font-medium">{course.title}</h4>
-                                  <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
-                                    <span>{course.students} студентов</span>
-                                    <span>★ {course.rating}</span>
-                                    <span>{course.completionRate}% завершений</span>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <p className="font-bold text-green-600">{course.revenue}</p>
+                                  <p className="text-sm text-gray-500 mt-1">Статус: {course.status}</p>
                                 </div>
                               </div>
                             ))}
@@ -281,92 +240,34 @@ export default function CoachDashboard() {
                                 {getStatusBadge(course.status)}
                               </div>
                               <p className="text-gray-600 mb-3">{course.description}</p>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                  <span className="text-gray-500">Студенты:</span>
-                                  <p className="font-medium">{course.students}</p>
-                                </div>
-                                <div>
-                                  <span className="text-gray-500">Рейтинг:</span>
-                                  <p className="font-medium">★ {course.rating}</p>
-                                </div>
-                                <div>
-                                  <span className="text-gray-500">Уроков:</span>
-                                  <p className="font-medium">{course.lessons}</p>
-                                </div>
-                                <div>
-                                  <span className="text-gray-500">Доход:</span>
-                                  <p className="font-medium text-green-600">{course.revenue}</p>
-                                </div>
-                              </div>
+                              <p className="text-sm text-gray-500">
+                                Обновлён {new Date(course.lastUpdated).toLocaleDateString("ru-RU")}
+                              </p>
                             </div>
-                            <div className="flex gap-2 ml-4">
-                              <Link href={`/courses/${course.id}`}>
-                                <Button size="sm" variant="outline">
-                                  <Eye className="w-4 h-4 mr-1" />
-                                  Просмотр
-                                </Button>
-                              </Link>
-                              <Link href={`/coach/courses/${course.id}/edit`}>
-                                <Button size="sm" variant="outline">
-                                  <FileText className="w-4 h-4 mr-1" />
-                                  Редактировать
-                                </Button>
-                              </Link>
-                              {course.status === "published" && (
-                                <Link href={`/coach/courses/${course.id}/analytics`}>
-                                  <Button size="sm" variant="outline">
-                                    <BarChart3 className="w-4 h-4 mr-1" />
-                                    Статистика
-                                  </Button>
-                                </Link>
-                              )}
-                            </div>
+                            <Link href={`/courses/${course.id}`}>
+                              <Button size="sm" variant="outline">
+                                <Eye className="w-4 h-4 mr-1" />
+                                Просмотр
+                              </Button>
+                            </Link>
                           </div>
                         </CardContent>
                       </Card>
                     ))}
                   </TabsContent>
 
-                  <TabsContent value="analytics" className="space-y-6 mt-6">
-                    <div className="grid gap-6 md:grid-cols-2">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Доходы по месяцам</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                            <p className="text-gray-500">График доходов</p>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Популярность курсов</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-3">
-                            {courses
-                              .filter((c) => c.status === "published")
-                              .map((course) => (
-                                <div key={course.id} className="flex items-center justify-between">
-                                  <span className="text-sm">{course.title}</span>
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-20 bg-gray-200 rounded-full h-2">
-                                      <div
-                                        className="bg-purple-600 h-2 rounded-full"
-                                        style={{ width: `${(course.students / 100) * 100}%` }}
-                                      ></div>
-                                    </div>
-                                    <span className="text-sm font-medium">{course.students}</span>
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
+                  <TabsContent value="analytics" className="space-y-4 mt-6">
+                    <Card>
+                      <CardContent className="py-10 text-center">
+                        <p className="text-gray-600 mb-4">Подробная аналитика доступна на отдельной странице</p>
+                        <Link href="/coach/analytics">
+                          <Button className="bg-purple-600 hover:bg-purple-700">
+                            <BarChart3 className="w-4 h-4 mr-2" />
+                            Открыть аналитику
+                          </Button>
+                        </Link>
+                      </CardContent>
+                    </Card>
                   </TabsContent>
 
                   <TabsContent value="students" className="space-y-4 mt-6">

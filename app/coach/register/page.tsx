@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BookOpen, CheckCircle, ArrowRight } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 export default function CoachRegister() {
   const [step, setStep] = useState(1)
@@ -45,7 +46,11 @@ export default function CoachRegister() {
 
   const handleComplete = async () => {
     if (!formData.agreeTerms) {
-      alert("Необходимо согласиться с условиями использования")
+      toast.error("Необходимо согласиться с условиями использования")
+      return
+    }
+    if (!formData.personalInfo.email.trim()) {
+      toast.error("Укажите email")
       return
     }
 
@@ -53,7 +58,7 @@ export default function CoachRegister() {
 
     try {
       await register({
-        email: formData.personalInfo.email || "coach@example.com",
+        email: formData.personalInfo.email.trim(),
         password: "TempPass123",
         role: "coach",
         profile_name: `${formData.personalInfo.firstName} ${formData.personalInfo.lastName}`.trim() || "Новый коуч",
@@ -63,7 +68,7 @@ export default function CoachRegister() {
       router.push("/coach/dashboard")
     } catch (error) {
       console.error("Registration error:", error)
-      alert(error instanceof Error ? error.message : "Ошибка регистрации. Попробуйте еще раз.")
+      toast.error(error instanceof Error ? error.message : "Ошибка регистрации. Попробуйте еще раз.")
     } finally {
       setIsLoading(false)
     }

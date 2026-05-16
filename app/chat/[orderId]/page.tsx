@@ -9,19 +9,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
 import {
   Send,
   Paperclip,
-  Phone,
-  Video,
-  MoreVertical,
   ArrowLeft,
-  CheckCircle,
-  Star,
   Calendar,
-  DollarSign,
-  Clock,
   Upload,
   AlertCircle,
   Loader2,
@@ -39,7 +31,6 @@ import type { Chat } from "@/lib/api/types"
 export default function OrderChatPage({ params }: { params: { orderId: string } }) {
   const { user } = useAuth()
   const [messageInput, setMessageInput] = useState("")
-  const [workProgress, setWorkProgress] = useState(0)
   const [chat, setChat] = useState<Chat | null>(null)
   const [loadingChat, setLoadingChat] = useState(true)
   const [sendError, setSendError] = useState<string | null>(null)
@@ -120,12 +111,6 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSendMessage()
-    }
-  }
-
-  const handleCompleteWork = () => {
-    if (confirm("Вы уверены, что работа выполнена полностью?")) {
-      alert("Заказчик получил уведомление о завершении работы! Ожидайте подтверждения.")
     }
   }
 
@@ -213,33 +198,6 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
                         </div>
                       )}
 
-                      <div className="pt-4 border-t">
-                        <h4 className="font-medium mb-3">Прогресс работы</h4>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span>Выполнено:</span>
-                            <span className="font-medium">{workProgress}%</span>
-                          </div>
-                          <Progress value={workProgress} />
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setWorkProgress(Math.min(100, workProgress + 10))}
-                            >
-                              +10%
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setWorkProgress(Math.max(0, workProgress - 10))}
-                            >
-                              -10%
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-
                       <div className="pt-4 border-t space-y-2">
                         <input
                           ref={fileInputRef}
@@ -262,12 +220,13 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
                           )}
                           Загрузить файлы
                         </Button>
-                        <Button
-                          onClick={handleCompleteWork}
-                          className="w-full bg-green-600 hover:bg-green-700"
-                        >
-                          Завершить работу
-                        </Button>
+                        {chat?.order_id && (
+                          <Link href={`/orders/${chat.order_id}`}>
+                            <Button className="w-full" variant="outline">
+                              Перейти к заказу
+                            </Button>
+                          </Link>
+                        )}
                       </div>
                     </>
                   )}
@@ -303,17 +262,6 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline">
-                        <Phone className="w-4 h-4" />
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        <Video className="w-4 h-4" />
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </div>
                   </div>
                   {error && (
                     <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">

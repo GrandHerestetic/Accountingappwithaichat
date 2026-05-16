@@ -96,13 +96,6 @@ export default function FeaturesPage() {
     },
   ]
 
-  const stats = [
-    { number: "5000+", label: "Активных пользователей" },
-    { number: "1200+", label: "Выполненных заказов" },
-    { number: "98%", label: "Довольных клиентов" },
-    { number: "24/7", label: "Поддержка пользователей" },
-  ]
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <Navigation />
@@ -118,18 +111,6 @@ export default function FeaturesPage() {
             BuhPro предоставляет полный набор инструментов для эффективного сотрудничества между заказчиками и
             исполнителями
           </p>
-        </div>
-
-        {/* Stats Section */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-16">
-          {stats.map((stat, index) => (
-            <Card key={index} className="text-center">
-              <CardContent className="pt-6">
-                <div className="text-3xl font-bold text-blue-600 mb-2">{stat.number}</div>
-                <div className="text-gray-600">{stat.label}</div>
-              </CardContent>
-            </Card>
-          ))}
         </div>
 
         {/* Features Grid */}
