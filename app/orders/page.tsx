@@ -23,6 +23,7 @@ import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { listOrders } from "@/lib/api"
 import type { Order, OrderStatus, PaginatedResponse } from "@/lib/api/types"
+import { ORDER_CATEGORIES, ORDER_CATEGORY_LABELS } from "@/lib/order-categories"
 import { toast } from "sonner"
 
 // ---------------------------------------------------------------------------
@@ -48,24 +49,11 @@ const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   archived: "В архиве",
 }
 
-const CATEGORIES = [
-  "Все категории",
-  "accounting",
-  "tax_consulting",
-  "audit",
-  "financial_analysis",
-  "accounting_recovery",
-  "reporting",
-]
+const CATEGORIES = ["Все категории", ...ORDER_CATEGORIES.map((c) => c.slug)]
 
 const CATEGORY_LABELS: Record<string, string> = {
   "Все категории": "Все категории",
-  accounting: "Бухгалтерский учет",
-  tax_consulting: "Налоговое консультирование",
-  audit: "Аудиторские услуги",
-  financial_analysis: "Финансовый анализ",
-  accounting_recovery: "Восстановление учета",
-  reporting: "Подготовка отчетности",
+  ...ORDER_CATEGORY_LABELS,
 }
 
 export default function PublicOrders() {

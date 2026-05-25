@@ -15,6 +15,8 @@ interface UseChatOptions {
 }
 
 const POLL_MS = 4000
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function useChat({ chatId, userId }: UseChatOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -30,7 +32,7 @@ export function useChat({ chatId, userId }: UseChatOptions) {
   }, [chatId, userId])
 
   useEffect(() => {
-    if (!chatId) return
+    if (!chatId || !UUID_RE.test(chatId)) return
     let cancelled = false
 
     const tick = async () => {
@@ -59,6 +61,9 @@ export function useChat({ chatId, userId }: UseChatOptions) {
   }, [chatId, userId])
 
   const sendMessage = async (content: string, attachmentIds?: string[]) => {
+    if (!chatId || !UUID_RE.test(chatId)) {
+      throw new Error("Чат недоступен")
+    }
     const text = content.trim()
     if (!text && !attachmentIds?.length) {
       throw new Error("Введите текст или прикрепите файл")

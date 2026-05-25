@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
@@ -15,10 +14,23 @@ import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { createOrder, submitMyOrder } from "@/lib/api"
 import type { CreateOrderRequest, Order } from "@/lib/api/types"
+import { ORDER_CATEGORIES } from "@/lib/order-categories"
+import { FormField, fieldAriaProps, fieldInputClass } from "@/components/form-field"
+import {
+  clearFieldError,
+  type FieldErrors,
+  validateBudget,
+  validateMinLength,
+  validateRequired,
+} from "@/lib/form-errors"
+import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+
+type OrderField = "title" | "description" | "category" | "region" | "deadline" | "budget"
 
 export default function CreateOrder() {
   const router = useRouter()
+  const [errors, setErrors] = useState<FieldErrors<OrderField>>({})
   const [selectedCategory, setSelectedCategory] = useState("")
   const [selectedRegion, setSelectedRegion] = useState("")
   const [selectedPromotions, setSelectedPromotions] = useState<string[]>([])
@@ -28,16 +40,7 @@ export default function CreateOrder() {
   const [description, setDescription] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const categories = [
-    { label: "Ведение бухгалтерского учета", slug: "accounting" },
-    { label: "Налоговое консультирование", slug: "tax-consulting" },
-    { label: "Аудиторские услуги", slug: "audit" },
-    { label: "Финансовый анализ", slug: "financial-analysis" },
-    { label: "Подготовка отчетности", slug: "reporting" },
-    { label: "Восстановление учета", slug: "accounting-recovery" },
-    { label: "Консультации по налогам", slug: "tax-advice" },
-    { label: "Другое", slug: "other" },
-  ]
+  const categories = ORDER_CATEGORIES.map((c) => ({ label: c.label, slug: c.slug }))
 
   const regions = [
     "Алматы",
@@ -100,31 +103,31 @@ export default function CreateOrder() {
   }
 
   const handleSubmit = async () => {
-    if (!title.trim()) {
-      toast.error("Введите название заказа")
-      return
-    }
-    if (!description.trim()) {
-      toast.error("Введите описание заказа")
-      return
-    }
-    if (!selectedCategory) {
-      toast.error("Выберите категорию")
-      return
-    }
-    const budgetNum = parseFloat(budget)
-    if (!budget || isNaN(budgetNum) || budgetNum < 0.01 || budgetNum > 999999999.99) {
-      toast.error("Укажите корректный бюджет (от 0.01 до 999 999 999.99)")
-      return
-    }
+    const categorySlug =
+      categories.find((c) => c.label === selectedCategory)?.slug ?? selectedCategory
 
-    const categorySlug = categories.find((c) => c.label === selectedCategory)?.slug ?? selectedCategory
+    const nextErrors: FieldErrors<OrderField> = {
+      title: validateMinLength(title, 3, "Название должно содержать минимум 3 символа"),
+      description: validateMinLength(description, 10, "Описание должно содержать минимум 10 символов"),
+      category: validateRequired(selectedCategory, "Выберите категорию"),
+      region: validateRequired(selectedRegion, "Выберите регион"),
+      deadline: validateRequired(deadline, "Укажите срок выполнения"),
+      budget: validateBudget(budget),
+    }
+    setErrors(nextErrors)
+    if (Object.values(nextErrors).some(Boolean)) return
+
+    const budgetNum = parseFloat(budget)
 
     const payload: CreateOrderRequest = {
       title: title.trim(),
       description: description.trim(),
       category_slug: categorySlug,
       budget_amount: budgetNum,
+      currency: "KZT",
+      region: selectedRegion,
+      deadline_at: deadline,
+      promotions: selectedPromotions as CreateOrderRequest["promotions"],
     }
 
     setIsSubmitting(true)
@@ -148,6 +151,10 @@ export default function CreateOrder() {
     }
   }
 
+  const clearError = (field: OrderField) => {
+    setErrors((prev) => clearFieldError(prev, field))
+  }
+
   return (
     <ProtectedRoute allowedRoles={["client"]}>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -169,20 +176,33 @@ export default function CreateOrder() {
                     <CardDescription>Опишите ваш заказ максимально подробно</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="title">Название заказа</Label>
+                    <FormField label="Название заказа" htmlFor="title" error={errors.title} required>
                       <Input
                         id="title"
                         placeholder="Например: Ведение бухгалтерского учета для ТОО"
                         value={title}
-                        onChange={(e) => setTitle(e.target.value)}
+                        onChange={(e) => {
+                          setTitle(e.target.value)
+                          clearError("title")
+                        }}
+                        className={fieldInputClass(errors.title)}
+                        {...fieldAriaProps(errors.title, "title")}
                       />
-                    </div>
+                    </FormField>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="category">Категория</Label>
-                      <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                        <SelectTrigger>
+                    <FormField label="Категория" htmlFor="category" error={errors.category} required>
+                      <Select
+                        value={selectedCategory}
+                        onValueChange={(value) => {
+                          setSelectedCategory(value)
+                          clearError("category")
+                        }}
+                      >
+                        <SelectTrigger
+                          id="category"
+                          className={fieldInputClass(errors.category)}
+                          {...fieldAriaProps(errors.category, "category")}
+                        >
                           <SelectValue placeholder="Выберите категорию услуг" />
                         </SelectTrigger>
                         <SelectContent>
@@ -193,56 +213,80 @@ export default function CreateOrder() {
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
+                    </FormField>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="description">Описание заказа</Label>
+                    <FormField label="Описание заказа" htmlFor="description" error={errors.description} required>
                       <Textarea
                         id="description"
                         placeholder="Подробно опишите что нужно сделать, какие требования к исполнителю, особые условия..."
                         rows={6}
                         value={description}
-                        onChange={(e) => setDescription(e.target.value)}
+                        onChange={(e) => {
+                          setDescription(e.target.value)
+                          clearError("description")
+                        }}
+                        className={fieldInputClass(errors.description)}
+                        {...fieldAriaProps(errors.description, "description")}
                       />
-                    </div>
+                    </FormField>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="budget">Бюджет (тенге)</Label>
+                      <FormField
+                        label="Бюджет (тенге)"
+                        htmlFor="budget"
+                        error={errors.budget}
+                        hint={errors.budget ? undefined : "Укажите примерный бюджет в тенге"}
+                        required
+                      >
                         <div className="relative">
                           <DollarSign className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                           <Input
                             id="budget"
                             placeholder="50000"
-                            className="pl-10"
+                            className={fieldInputClass(errors.budget, "pl-10")}
                             value={budget}
-                            onChange={(e) => setBudget(e.target.value)}
+                            onChange={(e) => {
+                              setBudget(e.target.value)
+                              clearError("budget")
+                            }}
+                            {...fieldAriaProps(errors.budget, "budget")}
                           />
                         </div>
-                        <p className="text-xs text-gray-500">Укажите примерный бюджет в тенге</p>
-                      </div>
+                      </FormField>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="deadline">Срок выполнения</Label>
+                      <FormField label="Срок выполнения" htmlFor="deadline" error={errors.deadline} required>
                         <div className="relative">
                           <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                           <Input
                             id="deadline"
                             type="date"
-                            className="pl-10"
+                            className={fieldInputClass(errors.deadline, "pl-10")}
                             value={deadline}
-                            onChange={(e) => setDeadline(e.target.value)}
+                            onChange={(e) => {
+                              setDeadline(e.target.value)
+                              clearError("deadline")
+                            }}
+                            {...fieldAriaProps(errors.deadline, "deadline")}
                           />
                         </div>
-                      </div>
+                      </FormField>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="region">Регион</Label>
+                    <FormField label="Регион" htmlFor="region" error={errors.region} required>
                       <div className="relative">
-                        <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-                          <SelectTrigger className="pl-10">
+                        <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400 z-10 pointer-events-none" />
+                        <Select
+                          value={selectedRegion}
+                          onValueChange={(value) => {
+                            setSelectedRegion(value)
+                            clearError("region")
+                          }}
+                        >
+                          <SelectTrigger
+                            id="region"
+                            className={cn("pl-10", fieldInputClass(errors.region))}
+                            {...fieldAriaProps(errors.region, "region")}
+                          >
                             <SelectValue placeholder="Выберите регион или укажите 'Онлайн'" />
                           </SelectTrigger>
                           <SelectContent>
@@ -254,7 +298,7 @@ export default function CreateOrder() {
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
+                    </FormField>
                   </CardContent>
                 </Card>
 

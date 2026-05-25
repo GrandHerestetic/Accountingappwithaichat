@@ -11,12 +11,22 @@ import { useEffect, useState } from "react"
 import { clearProfileAvatar, getProfile, setProfileAvatar, updateProfile, uploadFiles } from "@/lib/api"
 import { FileUploadField } from "@/components/file-upload-field"
 import { useAuth } from "@/contexts/auth-context"
+import { FormField, fieldAriaProps, fieldInputClass } from "@/components/form-field"
+import {
+  clearFieldError,
+  type FieldErrors,
+  validateMinLength,
+  validatePhone,
+} from "@/lib/form-errors"
 import { toast } from "sonner"
+
+type SettingsField = "display_name" | "phone" | "about" | "company_name"
 
 export default function SettingsPage() {
   const { user, refreshUser } = useAuth()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [errors, setErrors] = useState<FieldErrors<SettingsField>>({})
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarSaving, setAvatarSaving] = useState(false)
   const [form, setForm] = useState({
@@ -77,13 +87,21 @@ export default function SettingsPage() {
   }
 
   const handleSave = async () => {
+    const nextErrors: FieldErrors<SettingsField> = {
+      display_name: validateMinLength(form.display_name, 2, "Укажите имя или название"),
+      phone: validatePhone(form.phone),
+      about: form.about.trim() ? validateMinLength(form.about, 10, "Описание — минимум 10 символов") : undefined,
+    }
+    setErrors(nextErrors)
+    if (Object.values(nextErrors).some(Boolean)) return
+
     setSaving(true)
     try {
       await updateProfile({
-        display_name: form.display_name,
-        phone: form.phone,
-        about: form.about,
-        company_name: form.company_name,
+        display_name: form.display_name.trim(),
+        phone: form.phone.trim(),
+        about: form.about.trim(),
+        company_name: form.company_name.trim(),
       })
       await refreshUser()
       toast.success("Профиль сохранён")
@@ -91,6 +109,13 @@ export default function SettingsPage() {
       toast.error(e instanceof Error ? e.message : "Ошибка сохранения")
     } finally {
       setSaving(false)
+    }
+  }
+
+  const updateForm = (field: keyof typeof form, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }))
+    if (field in errors) {
+      setErrors((prev) => clearFieldError(prev, field as SettingsField))
     }
   }
 
@@ -146,38 +171,43 @@ export default function SettingsPage() {
                     )}
                   </div>
                 </div>
-                <div>
-                  <Label>Email</Label>
+                <FormField label="Email">
                   <Input value={user?.email ?? ""} disabled />
-                </div>
-                <div>
-                  <Label>Имя / название</Label>
+                </FormField>
+                <FormField label="Имя / название" htmlFor="display_name" error={errors.display_name} required>
                   <Input
+                    id="display_name"
                     value={form.display_name}
-                    onChange={(e) => setForm({ ...form, display_name: e.target.value })}
+                    onChange={(e) => updateForm("display_name", e.target.value)}
+                    className={fieldInputClass(errors.display_name)}
+                    {...fieldAriaProps(errors.display_name, "display_name")}
                   />
-                </div>
-                <div>
-                  <Label>Телефон</Label>
+                </FormField>
+                <FormField label="Телефон" htmlFor="phone" error={errors.phone}>
                   <Input
+                    id="phone"
                     value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    onChange={(e) => updateForm("phone", e.target.value)}
+                    className={fieldInputClass(errors.phone)}
+                    {...fieldAriaProps(errors.phone, "phone")}
                   />
-                </div>
-                <div>
-                  <Label>О компании</Label>
+                </FormField>
+                <FormField label="О компании" htmlFor="company_name">
                   <Input
+                    id="company_name"
                     value={form.company_name}
-                    onChange={(e) => setForm({ ...form, company_name: e.target.value })}
+                    onChange={(e) => updateForm("company_name", e.target.value)}
                   />
-                </div>
-                <div>
-                  <Label>О себе</Label>
+                </FormField>
+                <FormField label="О себе" htmlFor="about" error={errors.about}>
                   <Input
+                    id="about"
                     value={form.about}
-                    onChange={(e) => setForm({ ...form, about: e.target.value })}
+                    onChange={(e) => updateForm("about", e.target.value)}
+                    className={fieldInputClass(errors.about)}
+                    {...fieldAriaProps(errors.about, "about")}
                   />
-                </div>
+                </FormField>
                 <Button onClick={handleSave} disabled={saving}>
                   {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                   Сохранить

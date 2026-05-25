@@ -41,7 +41,7 @@ function ChatWindow({ chat, userId }: { chat: ChatListItem; userId: string }) {
 
   // Mark as read on open
   useEffect(() => {
-    markChatRead(chat.id).catch(() => {})
+    if (chat.id) markChatRead(chat.id).catch(() => {})
   }, [chat.id])
 
   const handleSend = async () => {
@@ -219,8 +219,9 @@ export default function ChatPage() {
     try {
       const data = await listMyChats({ page: 1, pageSize: 20 })
       setChats(data.items as ChatListItem[])
-      if (data.items.length > 0 && !selectedChatId) {
-        setSelectedChatId(data.items[0].id)
+      const firstChat = data.items.find((item) => item.id)
+      if (firstChat && !selectedChatId) {
+        setSelectedChatId(firstChat.id)
       }
     } catch {
       // Silently ignore — empty state shown

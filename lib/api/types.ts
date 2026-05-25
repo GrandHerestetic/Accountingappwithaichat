@@ -119,8 +119,13 @@ export interface PaymentTransaction {
 export interface CreateOrderRequest {
   title: string
   description: string
-  category_slug: string
+  category_slug?: string
+  category_id?: number
   budget_amount: number
+  currency?: string
+  region?: string
+  deadline_at?: string
+  promotions?: Array<"top" | "pin" | "highlight">
 }
 
 export interface UpdateOrderRequest {
@@ -128,6 +133,10 @@ export interface UpdateOrderRequest {
   description?: string
   category_slug?: string
   budget_amount?: number
+  currency?: string
+  region?: string
+  deadline_at?: string
+  promotions?: Array<"top" | "pin" | "highlight">
 }
 
 export interface PaginatedResponse<T> {
@@ -199,7 +208,8 @@ export interface Message {
   chat_id: string
   sender_type: "user" | "system"
   sender_user_id?: string
-  body: string
+  body?: string
+  text?: string
   created_at: string
   edited_at?: string
   deleted_at?: string

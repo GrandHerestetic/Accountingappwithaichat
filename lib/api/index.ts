@@ -1,5 +1,5 @@
 import { apiFormRequest, apiRequest } from "@/lib/api-client"
-import { normalizeChatSummary, normalizeMeResponse, normalizeMessage } from "./normalize"
+import { normalizeChatSummary, normalizeChatDetail, normalizeMeResponse, normalizeMessage } from "./normalize"
 import type {
   Chat,
   ChatDetail,
@@ -121,14 +121,29 @@ export async function getMyOrderDetails(id: string): Promise<OrderDetailsRespons
   return apiRequest<OrderDetailsResponse>(`/api/v1/orders/my/${id}`)
 }
 
+function toISODeadline(deadline: string): string {
+  const trimmed = deadline.trim()
+  if (!trimmed) return trimmed
+  if (trimmed.includes("T")) return trimmed
+  return `${trimmed}T12:00:00.000Z`
+}
+
 export async function createOrder(body: CreateOrderRequest): Promise<Order> {
-  return apiRequest<Order>("/api/v1/orders", { method: "POST", body: JSON.stringify(body) })
+  const payload = { ...body, currency: body.currency ?? "KZT" }
+  if (payload.deadline_at) {
+    payload.deadline_at = toISODeadline(payload.deadline_at)
+  }
+  return apiRequest<Order>("/api/v1/orders", { method: "POST", body: JSON.stringify(payload) })
 }
 
 export async function updateMyOrder(id: string, body: UpdateOrderRequest): Promise<Order> {
+  const payload = { ...body }
+  if (payload.deadline_at) {
+    payload.deadline_at = toISODeadline(payload.deadline_at)
+  }
   return apiRequest<Order>(`/api/v1/orders/my/${id}`, {
     method: "PATCH",
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   })
 }
 
@@ -211,22 +226,23 @@ export async function listMyResponses(params?: ListParams): Promise<PaginatedRes
   )
 }
 
-function toISODeadline(deadline: string): string {
-  const trimmed = deadline.trim()
-  if (!trimmed) return trimmed
-  if (trimmed.includes("T")) return trimmed
-  return `${trimmed}T12:00:00.000Z`
-}
-
 export async function createOrderResponse(
   orderId: string,
-  body: { proposed_amount: number; proposed_deadline: string; cover_letter: string }
+  body: { proposed_amount: number; cover_letter: string; currency?: string; proposed_deadline?: string }
 ): Promise<{ id: string; status: string }> {
+  let coverLetter = body.cover_letter.trim()
+  if (body.proposed_deadline?.trim()) {
+    const deadlineLabel = body.proposed_deadline.includes("T")
+      ? new Date(body.proposed_deadline).toLocaleDateString("ru-RU")
+      : body.proposed_deadline
+    coverLetter = `${coverLetter}\n\nПредлагаемый срок: ${deadlineLabel}`
+  }
   return apiRequest(`/api/v1/orders/${orderId}/responses`, {
     method: "POST",
     body: JSON.stringify({
-      ...body,
-      proposed_deadline: toISODeadline(body.proposed_deadline),
+      proposed_amount: body.proposed_amount,
+      cover_letter: coverLetter,
+      currency: body.currency ?? "KZT",
     }),
   })
 }
@@ -236,10 +252,7 @@ export async function updateMyResponse(
   responseId: string,
   body: UpdateResponseRequest
 ): Promise<OrderResponse> {
-  const payload = { ...body }
-  if (typeof payload.proposed_deadline === "string") {
-    payload.proposed_deadline = toISODeadline(payload.proposed_deadline)
-  }
+  const { proposed_deadline: _deadline, ...payload } = body
   return apiRequest(`/api/v1/orders/${orderId}/responses/my/${responseId}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
@@ -444,7 +457,8 @@ export async function listMyChats(params?: ListParams): Promise<PaginatedRespons
 }
 
 export async function getMyChat(chatId: string): Promise<ChatDetail> {
-  return apiRequest<ChatDetail>(`/api/v1/my/chats/${chatId}`)
+  const data = await apiRequest<Record<string, unknown>>(`/api/v1/my/chats/${chatId}`)
+  return normalizeChatDetail(data)
 }
 
 export async function listChatMessages(

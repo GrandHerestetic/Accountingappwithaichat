@@ -28,17 +28,19 @@ export default function HomePage() {
   const [platformStats, setPlatformStats] = useState<{ label: string; value: string }[]>([])
 
   useEffect(() => {
-    Promise.all([
+    Promise.allSettled([
       listOrders({ page: 1, pageSize: 1 }),
       listCourses({ page: 1, pageSize: 1 }),
-    ])
-      .then(([orders, courses]) => {
-        setPlatformStats([
-          { label: "Заказов на платформе", value: String(orders.total) },
-          { label: "Курсов в каталоге", value: String(courses.total) },
-        ])
-      })
-      .catch(() => setPlatformStats([]))
+    ]).then(([ordersResult, coursesResult]) => {
+      const stats: { label: string; value: string }[] = []
+      if (ordersResult.status === "fulfilled") {
+        stats.push({ label: "Заказов на платформе", value: String(ordersResult.value.total) })
+      }
+      if (coursesResult.status === "fulfilled") {
+        stats.push({ label: "Курсов в каталоге", value: String(coursesResult.value.total) })
+      }
+      setPlatformStats(stats)
+    })
   }, [])
 
   const features = [

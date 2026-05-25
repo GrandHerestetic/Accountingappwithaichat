@@ -12,12 +12,22 @@ import { Eye, EyeOff, Briefcase, BookOpen, Settings } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+import { FormField, fieldAriaProps, fieldInputClass } from "@/components/form-field"
+import {
+  clearFieldError,
+  type FieldErrors,
+  validateEmail,
+  validatePassword,
+} from "@/lib/form-errors"
 import { toast } from "sonner"
+
+type LoginField = "email" | "password"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [activeTab, setActiveTab] = useState("client")
   const [isLoading, setIsLoading] = useState(false)
+  const [errors, setErrors] = useState<FieldErrors<LoginField>>({})
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -26,31 +36,80 @@ export default function LoginPage() {
   const { login } = useAuth()
   const router = useRouter()
 
-  const handleLogin = async (userType: string) => {
-    // Простая валидация
-    if (!formData.email || !formData.password) {
-      toast.error("Пожалуйста, заполните все поля")
-      return
+  const updateField = (field: LoginField, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+    setErrors((prev) => clearFieldError(prev, field))
+  }
+
+  const validateForm = (): boolean => {
+    const next: FieldErrors<LoginField> = {
+      email: validateEmail(formData.email),
+      password: validatePassword(formData.password),
     }
+    setErrors(next)
+    return !next.email && !next.password
+  }
+
+  const handleLogin = async (userType: string) => {
+    if (!validateForm()) return
 
     setIsLoading(true)
 
     try {
       await login({
-        email: formData.email,
+        email: formData.email.trim(),
         password: formData.password,
       })
 
-      // Перенаправление на соответствующий дашборд
       const redirectPath = getDashboardPath(userType)
       router.push(redirectPath)
     } catch (error) {
       console.error("Login error:", error)
-      toast.error(error instanceof Error ? error.message : "Ошибка входа. Попробуйте еще раз.")
+      const message = error instanceof Error ? error.message : "Ошибка входа. Попробуйте еще раз."
+      setErrors({ email: message })
+      toast.error(message)
     } finally {
       setIsLoading(false)
     }
   }
+
+  const renderLoginFields = (emailId: string, passwordId: string) => (
+    <>
+      <FormField label="Email" htmlFor={emailId} error={errors.email} required>
+        <Input
+          id={emailId}
+          type="email"
+          placeholder="example@company.kz"
+          value={formData.email}
+          onChange={(e) => updateField("email", e.target.value)}
+          className={fieldInputClass(errors.email)}
+          {...fieldAriaProps(errors.email, emailId)}
+        />
+      </FormField>
+      <FormField label="Пароль" htmlFor={passwordId} error={errors.password} required>
+        <div className="relative">
+          <Input
+            id={passwordId}
+            type={showPassword ? "text" : "password"}
+            placeholder="Введите пароль"
+            value={formData.password}
+            onChange={(e) => updateField("password", e.target.value)}
+            className={fieldInputClass(errors.password)}
+            {...fieldAriaProps(errors.password, passwordId)}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+            onClick={() => setShowPassword(!showPassword)}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+        </div>
+      </FormField>
+    </>
+  )
 
   const getDashboardPath = (type: string) => {
     switch (type) {
@@ -108,39 +167,7 @@ export default function LoginPage() {
 
               <TabsContent value="client" className="space-y-4">
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="client-email">Email или БИН/ИИН</Label>
-                    <Input
-                      id="client-email"
-                      type="text"
-                      placeholder="example@company.kz или 123456789012"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="client-password">Пароль</Label>
-                    <div className="relative">
-                      <Input
-                        id="client-password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Введите пароль"
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
+                  {renderLoginFields("client-email", "client-password")}
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="remember-client"
@@ -163,39 +190,7 @@ export default function LoginPage() {
 
               <TabsContent value="executor" className="space-y-4">
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="executor-email">Email или ИИН</Label>
-                    <Input
-                      id="executor-email"
-                      type="text"
-                      placeholder="example@email.kz или 123456789012"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="executor-password">Пароль</Label>
-                    <div className="relative">
-                      <Input
-                        id="executor-password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Введите пароль"
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
+                  {renderLoginFields("executor-email", "executor-password")}
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="remember-executor"

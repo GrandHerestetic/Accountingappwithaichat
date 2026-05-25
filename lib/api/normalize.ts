@@ -1,6 +1,8 @@
 import type {
   Chat,
+  ChatDetail,
   ChatMessage,
+  ChatParticipant,
   MeResponse,
   Message,
   UserProfile,
@@ -45,11 +47,12 @@ export function normalizeMeResponse(data: MeResponse | Record<string, unknown>):
 
 export function normalizeMessage(msg: Message, currentUserId?: string): ChatMessage {
   const deleted = Boolean(msg.deleted_at)
+  const body = msg.body ?? (msg as Message & { text?: string }).text ?? ""
   return {
     id: msg.id,
     chat_id: msg.chat_id,
     sender_id: msg.sender_user_id ?? "",
-    content: deleted ? "Сообщение удалено" : msg.body,
+    content: deleted ? "Сообщение удалено" : body,
     created_at: msg.created_at,
     is_read: currentUserId ? msg.sender_user_id === currentUserId : false,
     deleted_at: msg.deleted_at ?? null,
@@ -57,20 +60,33 @@ export function normalizeMessage(msg: Message, currentUserId?: string): ChatMess
   }
 }
 
-export function normalizeChatSummary(chat: {
-  id: string
-  order_id: string
-  created_at: string
-  participants?: { user_id: string; role?: string }[]
+type RawChat = {
+  id?: string
+  chat_id?: string
+  order_id?: string
+  created_at?: string
+  participants?: ChatParticipant[]
   last_message?: string
   last_message_at?: string
-}): Chat {
+  last_message_preview?: string
+}
+
+export function normalizeChatSummary(chat: RawChat): Chat {
   return {
-    id: chat.id,
-    order_id: chat.order_id,
+    id: chat.id ?? chat.chat_id ?? "",
+    order_id: chat.order_id ?? "",
     participant_ids: chat.participants?.map((p) => p.user_id) ?? [],
-    created_at: chat.created_at,
-    last_message: chat.last_message,
+    created_at: chat.created_at ?? chat.last_message_at ?? "",
+    last_message: chat.last_message ?? chat.last_message_preview,
     last_message_at: chat.last_message_at,
+    participants: chat.participants,
+  }
+}
+
+export function normalizeChatDetail(chat: RawChat & { participants?: ChatParticipant[] }): ChatDetail {
+  const summary = normalizeChatSummary(chat)
+  return {
+    ...summary,
+    participants: chat.participants ?? [],
   }
 }

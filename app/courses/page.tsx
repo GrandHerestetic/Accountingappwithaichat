@@ -8,12 +8,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search, Filter, X, BookOpen, Loader2 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
+import { useAuth } from "@/contexts/auth-context"
 import { listCourses } from "@/lib/api"
 import type { Course, PaginatedResponse } from "@/lib/api/types"
 import { toast } from "sonner"
 import Link from "next/link"
 
 export default function CoursesPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth()
+  const canViewCourses =
+    isAuthenticated && user && ["executor", "coach", "admin"].includes(user.role)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [sortBy, setSortBy] = useState("newest")
@@ -25,6 +29,13 @@ export default function CoursesPage() {
   // Fetch published courses from the API
   // ---------------------------------------------------------------------------
   useEffect(() => {
+    if (authLoading) return
+    if (!canViewCourses) {
+      setLoading(false)
+      setCourses([])
+      return
+    }
+
     const fetchCourses = async () => {
       setLoading(true)
       try {
@@ -39,7 +50,7 @@ export default function CoursesPage() {
       }
     }
     fetchCourses()
-  }, [])
+  }, [authLoading, canViewCourses])
 
   // ---------------------------------------------------------------------------
   // Client-side filtering and sorting
@@ -122,7 +133,9 @@ export default function CoursesPage() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Search and filters */}
+        {canViewCourses && (
+          <>
+            {/* Search and filters */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -198,14 +211,14 @@ export default function CoursesPage() {
         </Card>
 
         {/* Loading */}
-        {loading && (
+        {(loading || authLoading) && (
           <div className="flex justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
           </div>
         )}
 
         {/* Results count */}
-        {!loading && (
+        {!loading && !authLoading && canViewCourses && (
           <div className="mb-6">
             <p className="text-gray-600">
               Найдено курсов: <span className="font-medium">{filteredCourses.length}</span>
@@ -214,7 +227,7 @@ export default function CoursesPage() {
         )}
 
         {/* Course grid */}
-        {!loading && filteredCourses.length > 0 && (
+        {!loading && !authLoading && canViewCourses && filteredCourses.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCourses.map((course) => (
               <Card
@@ -248,9 +261,29 @@ export default function CoursesPage() {
             ))}
           </div>
         )}
+          </>
+        )}
 
-        {/* Empty state */}
-        {!loading && filteredCourses.length === 0 && (
+        {!loading && !authLoading && !canViewCourses && (
+          <Card className="text-center py-12">
+            <CardContent>
+              <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Каталог курсов для специалистов</h3>
+              <p className="text-gray-600 mb-4">
+                {isAuthenticated
+                  ? "Курсы доступны исполнителям, коучам и администраторам."
+                  : "Войдите как исполнитель или коуч, чтобы просматривать каталог курсов."}
+              </p>
+              {!isAuthenticated && (
+                <Link href="/auth/login">
+                  <Button>Войти</Button>
+                </Link>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {!loading && !authLoading && canViewCourses && filteredCourses.length === 0 && (
           <Card className="text-center py-12">
             <CardContent>
               <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />

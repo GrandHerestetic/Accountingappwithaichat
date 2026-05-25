@@ -53,25 +53,22 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
   const fetchChat = useCallback(async () => {
     try {
       const orderOrChatId = params.orderId
+      const data = await listMyChats({ page: 1, pageSize: 100 })
+      const found =
+        data.items.find((c) => c.id === orderOrChatId) ??
+        data.items.find((c) => c.order_id === orderOrChatId)
+      if (found?.id) {
+        setChat(found)
+        setChatId(found.id)
+        return
+      }
+
       try {
         const detail = await getMyChat(orderOrChatId)
-        setChat({
-          id: detail.id,
-          order_id: detail.order_id,
-          participant_ids: detail.participants?.map((p) => p.user_id) ?? [],
-          created_at: detail.created_at,
-          participants: detail.participants,
-        })
+        setChat(detail)
         setChatId(detail.id)
       } catch {
-        const data = await listMyChats({ page: 1, pageSize: 100 })
-        const found =
-          data.items.find((c) => c.id === orderOrChatId) ??
-          data.items.find((c) => c.order_id === orderOrChatId)
-        if (found) {
-          setChat(found)
-          setChatId(found.id)
-        }
+        // chat not found for this order/id
       }
     } catch {
       // ignore
