@@ -7,19 +7,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BookOpen, Play, Download, ExternalLink, Loader2, ArrowLeft } from "lucide-react"
-import { getCourseDetail } from "@/lib/api"
-import type { Course, CourseMaterial } from "@/lib/api/types"
+import { getCourseDetail, listMyCourseAssignments } from "@/lib/api"
+import type { Course, CourseAssignment, CourseMaterial } from "@/lib/api/types"
 import { toast } from "sonner"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
-import { COURSE_STATUS_LABELS, sortMaterials } from "@/lib/course-utils"
+import { COURSE_STATUS_LABELS, isAssignmentActive, sortMaterials } from "@/lib/course-utils"
+import { useAuth } from "@/contexts/auth-context"
+import { CourseEnrollButton } from "@/components/courses/course-enroll-button"
 
 export default function CourseDetailPage() {
   const params = useParams()
   const courseId = params.id as string
+  const { user } = useAuth()
+  const isExecutor = user?.role === "executor"
 
   const [course, setCourse] = useState<Course | null>(null)
   const [materials, setMaterials] = useState<CourseMaterial[]>([])
+  const [assignment, setAssignment] = useState<CourseAssignment | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("overview")
 
@@ -27,9 +32,18 @@ export default function CourseDetailPage() {
     const fetchCourse = async () => {
       setLoading(true)
       try {
-        const detail = await getCourseDetail(courseId)
+        const [detail, assignmentsData] = await Promise.all([
+          getCourseDetail(courseId),
+          isExecutor
+            ? listMyCourseAssignments({ page: 1, pageSize: 100 })
+            : Promise.resolve({ items: [] as CourseAssignment[], total: 0, page: 1, page_size: 0 }),
+        ])
         setCourse(detail.course)
         setMaterials(sortMaterials(detail.materials ?? []))
+        const active = assignmentsData.items.find(
+          (item) => item.course_id === courseId && isAssignmentActive(item.status)
+        )
+        setAssignment(active ?? null)
       } catch (err) {
         const message = err instanceof Error ? err.message : "Не удалось загрузить курс"
         toast.error(message)
@@ -38,7 +52,7 @@ export default function CourseDetailPage() {
       }
     }
     fetchCourse()
-  }, [courseId])
+  }, [courseId, isExecutor])
 
   // ---------------------------------------------------------------------------
   // Render a single material based on its type (requirement 7.8)
@@ -185,6 +199,17 @@ export default function CourseDetailPage() {
             <p className="text-sm text-blue-200">
               Добавлен: {new Date(course.created_at).toLocaleDateString("ru-RU")}
             </p>
+
+            {isExecutor && course.status === "published" && (
+              <div className="pt-2">
+                <CourseEnrollButton
+                  courseId={course.id}
+                  assignment={assignment}
+                  className="bg-green-600 hover:bg-green-700"
+                  onEnrolled={setAssignment}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

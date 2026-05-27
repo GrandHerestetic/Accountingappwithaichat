@@ -80,6 +80,7 @@ export function Navigation() {
     if (path === "/admin/orders" && pathname === "/admin/orders") return true
     if (path === "/admin/disputes" && pathname === "/admin/disputes") return true
     if (path === "/admin/analytics" && pathname === "/admin/analytics") return true
+    if (path === "/admin/course-assignments" && pathname === "/admin/course-assignments") return true
 
     return false
   }
@@ -228,6 +229,12 @@ export function Navigation() {
             label: "Управление заказами",
             icon: FileText,
             active: isActive("/admin/orders"),
+          },
+          {
+            href: "/admin/course-assignments",
+            label: "Назначение курсов",
+            icon: BookOpen,
+            active: isActive("/admin/course-assignments"),
           },
         ]
       default:

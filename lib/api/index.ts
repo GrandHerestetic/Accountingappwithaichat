@@ -13,6 +13,8 @@ import type {
   CreateEntityReviewRequest,
   CreateOrderRequest,
   CreateReviewRequest,
+  MyReview,
+  UpdateReviewRequest,
   AttachmentTargetType,
   AttachmentView,
   EntityRatingSummary,
@@ -240,6 +242,29 @@ export async function createClientOrderReview(orderId: string, body: CreateRevie
     method: "POST",
     body: JSON.stringify(body),
   })
+}
+
+// ─── My reviews (authored CRUD) ─────────────────────────────────────────────
+
+export async function listMyReviews(params?: ListParams): Promise<PaginatedResponse<MyReview>> {
+  return apiRequest(
+    `/api/v1/my/reviews${qs({ page: params?.page ?? 1, page_size: params?.pageSize ?? 20 })}`
+  )
+}
+
+export async function getMyReview(reviewId: string): Promise<MyReview> {
+  return apiRequest<MyReview>(`/api/v1/my/reviews/${reviewId}`)
+}
+
+export async function updateMyReview(reviewId: string, body: UpdateReviewRequest): Promise<MyReview> {
+  return apiRequest<MyReview>(`/api/v1/my/reviews/${reviewId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  })
+}
+
+export async function deleteMyReview(reviewId: string): Promise<MyReview> {
+  return apiRequest<MyReview>(`/api/v1/my/reviews/${reviewId}`, { method: "DELETE" })
 }
 
 // ─── Executor responses ───────────────────────────────────────────────────────
@@ -799,6 +824,13 @@ export async function getMyCourseAssignment(id: string): Promise<CourseAssignmen
 
 export async function markCourseAssignmentCompleted(id: string): Promise<void> {
   return apiRequest(`/api/v1/my/course-assignments/${id}/mark-completed`, { method: "POST" })
+}
+
+export async function enrollInCourse(courseId: string): Promise<CourseAssignment> {
+  return apiRequest<CourseAssignment>("/api/v1/my/course-assignments/enroll", {
+    method: "POST",
+    body: JSON.stringify({ course_id: courseId }),
+  })
 }
 
 // ─── Admin ────────────────────────────────────────────────────────────────────

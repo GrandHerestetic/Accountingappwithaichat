@@ -29,11 +29,13 @@ import {
   X,
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
+import { AdminProfilePanel } from "@/components/profile/admin-profile-panel"
 import { useAuth } from "@/contexts/auth-context"
 import { getExecutorRating, getExecutorReviews, getProfile, updateProfile, uploadProfileAvatar } from "@/lib/api"
 import { FileUploadField } from "@/components/file-upload-field"
 import { ProfileAchievementsTab } from "@/components/profile/profile-achievements-tab"
 import { ProfilePortfolioTab } from "@/components/profile/profile-portfolio-tab"
+import { MyReviewsPanel } from "@/components/reviews/my-reviews-panel"
 import { resolveUploadUrl } from "@/lib/upload-url"
 import {
   filterProfileDocuments,
@@ -138,6 +140,10 @@ export default function ProfilePage() {
   }
 
   useEffect(() => {
+    if (user?.role === "admin") {
+      setLoading(false)
+      return
+    }
     const load = async () => {
       try {
         const p = await getProfile()
@@ -237,6 +243,10 @@ export default function ProfilePage() {
     if (field === "name" || field === "phone" || field === "website") {
       setProfileErrors((prev) => clearFieldError(prev, field))
     }
+  }
+
+  if (user?.role === "admin") {
+    return <AdminProfilePanel />
   }
 
   return (
@@ -528,44 +538,57 @@ export default function ProfilePage() {
                 </TabsContent>
 
                 <TabsContent value="reviews" className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Отзывы клиентов</CardTitle>
-                      <CardDescription>
-                        {profile.reviewsCount} отзывов со средней оценкой {profile.rating}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {reviews.map((review) => (
-                        <div key={review.id} className="border-b pb-6 last:border-b-0">
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <h4 className="font-medium">Заказ #{review.order_id.slice(0, 8)}</h4>
-                              <p className="text-sm text-gray-600">Отзыв клиента</p>
-                            </div>
-                            <div className="text-right">
-                              <div className="flex items-center gap-1 mb-1">
-                                {[...Array(5)].map((_, i) => (
-                                  <Star
-                                    key={i}
-                                    className={`w-4 h-4 ${
-                                      i < review.rating ? "text-yellow-500 fill-current" : "text-gray-300"
-                                    }`}
-                                  />
-                                ))}
+                  {user?.role === "executor" && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Отзывы обо мне</CardTitle>
+                        <CardDescription>
+                          {profile.reviewsCount} отзывов · средняя оценка {profile.rating.toFixed(1)}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {reviews.length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-6">
+                            Пока нет отзывов от клиентов
+                          </p>
+                        ) : (
+                          reviews.map((review) => (
+                            <div key={review.id} className="border-b pb-6 last:border-b-0">
+                              <div className="flex items-start justify-between mb-3">
+                                <div>
+                                  <h4 className="font-medium">
+                                    Заказ #{review.order_id.slice(0, 8)}
+                                  </h4>
+                                  <p className="text-sm text-gray-600">Отзыв клиента</p>
+                                </div>
+                                <div className="text-right">
+                                  <div className="flex items-center gap-1 mb-1">
+                                    {[...Array(5)].map((_, i) => (
+                                      <Star
+                                        key={i}
+                                        className={`w-4 h-4 ${
+                                          i < review.rating
+                                            ? "text-yellow-500 fill-current"
+                                            : "text-gray-300"
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                  <p className="text-sm text-gray-500">
+                                    {review.created_at
+                                      ? new Date(review.created_at).toLocaleDateString("ru-RU")
+                                      : ""}
+                                  </p>
+                                </div>
                               </div>
-                              <p className="text-sm text-gray-500">
-                                {review.created_at
-                                  ? new Date(review.created_at).toLocaleDateString("ru-RU")
-                                  : ""}
-                              </p>
+                              <p className="text-gray-700">{review.comment ?? ""}</p>
                             </div>
-                          </div>
-                          <p className="text-gray-700">{review.comment ?? ""}</p>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+                  <MyReviewsPanel userRole={user?.role} />
                 </TabsContent>
 
                 <TabsContent value="portfolio" className="space-y-6">

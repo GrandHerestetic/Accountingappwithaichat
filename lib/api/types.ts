@@ -381,6 +381,25 @@ export interface CreateReviewRequest {
   comment?: string
 }
 
+export type UpdateReviewRequest = CreateReviewRequest
+
+/** Отзыв из GET/PATCH/DELETE /api/v1/my/reviews */
+export interface MyReview {
+  id: string
+  source: "order" | "entity"
+  order_id?: string | null
+  target_type?: string | null
+  target_id?: string | null
+  reviewee_id?: string | null
+  reviewee_role?: string | null
+  direction?: string | null
+  rating: number
+  comment?: string | null
+  metadata?: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
 export interface RatingInfo {
   executor_id: string
   reviews_count_total: number

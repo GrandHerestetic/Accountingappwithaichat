@@ -12,6 +12,7 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { listMyCourseAssignments, markCourseAssignmentCompleted } from "@/lib/api"
 import type { CourseAssignment } from "@/lib/api/types"
 import {
+  ASSIGNMENT_SOURCE_LABELS,
   ASSIGNMENT_STATUS_COLORS,
   ASSIGNMENT_STATUS_LABELS,
   assignmentProgressPercent,
@@ -74,7 +75,7 @@ export default function ExecutorCoursesPage() {
             <div className="flex justify-between items-center mb-8">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Мои курсы</h1>
-                <p className="text-gray-600">Назначенные вам обучающие курсы</p>
+                <p className="text-gray-600">Курсы для прохождения — назначенные администратором или добавленные вами из каталога</p>
               </div>
               <Link href="/courses">
                 <Button variant="outline">
@@ -152,6 +153,9 @@ export default function ExecutorCoursesPage() {
                                   Отменён
                                 </span>
                               )}
+                              <span className="text-xs text-gray-400">
+                                {ASSIGNMENT_SOURCE_LABELS[assignment.source] ?? assignment.source}
+                              </span>
                             </p>
                           </div>
 
@@ -191,11 +195,11 @@ export default function ExecutorCoursesPage() {
               <Card>
                 <CardContent className="py-16 text-center">
                   <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Нет назначенных курсов</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Нет курсов для прохождения</h3>
                   <p className="text-gray-600 mb-6">
                     {statusFilter !== "all"
                       ? "Нет курсов с выбранным статусом"
-                      : "Вам пока не назначены курсы"}
+                      : "Запишитесь на курс в каталоге или дождитесь назначения от администратора"}
                   </p>
                   <Link href="/courses">
                     <Button>Просмотреть каталог курсов</Button>

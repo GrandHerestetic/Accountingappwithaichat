@@ -10,19 +10,22 @@ import { Search, Filter, X, BookOpen, Loader2 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
-import { listCourses } from "@/lib/api"
-import type { Course, PaginatedResponse } from "@/lib/api/types"
+import { listCourses, listMyCourseAssignments } from "@/lib/api"
+import type { Course, CourseAssignment, PaginatedResponse } from "@/lib/api/types"
 import { toast } from "sonner"
-import { COURSE_STATUS_LABELS } from "@/lib/course-utils"
+import { COURSE_STATUS_LABELS, isAssignmentActive } from "@/lib/course-utils"
+import { CourseEnrollButton } from "@/components/courses/course-enroll-button"
 
 export default function CoursesPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   const canViewCourses =
     isAuthenticated && user && ["executor", "coach", "admin"].includes(user.role)
+  const isExecutor = user?.role === "executor"
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState("newest")
 
   const [courses, setCourses] = useState<Course[]>([])
+  const [assignmentsByCourse, setAssignmentsByCourse] = useState<Map<string, CourseAssignment>>(new Map())
   const [loading, setLoading] = useState(true)
 
   // ---------------------------------------------------------------------------
@@ -39,8 +42,22 @@ export default function CoursesPage() {
     const fetchCourses = async () => {
       setLoading(true)
       try {
-        const data = await listCourses({ page: 1, pageSize: 50, status: "published" })
-        setCourses(data.items)
+        const requests: [Promise<PaginatedResponse<Course>>, Promise<PaginatedResponse<CourseAssignment>> | null] = [
+          listCourses({ page: 1, pageSize: 50, status: "published" }),
+          isExecutor ? listMyCourseAssignments({ page: 1, pageSize: 100 }) : null,
+        ]
+        const [coursesData, assignmentsData] = await Promise.all([
+          requests[0],
+          requests[1] ?? Promise.resolve({ items: [], total: 0, page: 1, page_size: 0 }),
+        ])
+        setCourses(coursesData.items)
+        const map = new Map<string, CourseAssignment>()
+        for (const item of assignmentsData.items) {
+          if (isAssignmentActive(item.status)) {
+            map.set(item.course_id, item)
+          }
+        }
+        setAssignmentsByCourse(map)
       } catch (err) {
         const message = err instanceof Error ? err.message : "Не удалось загрузить курсы"
         toast.error(message)
@@ -49,7 +66,7 @@ export default function CoursesPage() {
       }
     }
     fetchCourses()
-  }, [authLoading, canViewCourses])
+  }, [authLoading, canViewCourses, isExecutor])
 
   // ---------------------------------------------------------------------------
   // Client-side filtering and sorting
@@ -218,9 +235,21 @@ export default function CoursesPage() {
                   </p>
                 </CardContent>
 
-                <CardFooter className="pt-0">
-                  <Link href={`/courses/${course.id}`} className="w-full">
-                    <Button className="w-full bg-blue-600 hover:bg-blue-700">Подробнее</Button>
+                <CardFooter className="pt-0 flex gap-2">
+                  {isExecutor && (
+                    <CourseEnrollButton
+                      courseId={course.id}
+                      assignment={assignmentsByCourse.get(course.id) ?? null}
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      onEnrolled={(assignment) => {
+                        setAssignmentsByCourse((prev) => new Map(prev).set(course.id, assignment))
+                      }}
+                    />
+                  )}
+                  <Link href={`/courses/${course.id}`} className={isExecutor ? "flex-1" : "w-full"}>
+                    <Button variant={isExecutor ? "outline" : "default"} className="w-full">
+                      Подробнее
+                    </Button>
                   </Link>
                 </CardFooter>
               </Card>

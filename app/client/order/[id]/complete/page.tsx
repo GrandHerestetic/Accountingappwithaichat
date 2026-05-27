@@ -30,8 +30,10 @@ import { Navigation } from "@/components/navigation"
 import {
   completeClientOrder,
   createClientOrderReview,
+  deleteMyReview,
   getClientOrderReview,
   reopenClientOrder,
+  updateMyReview,
 } from "@/lib/api"
 import type { Review, ApiError } from "@/lib/api/types"
 import { toast } from "sonner"
@@ -117,12 +119,34 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
 
     setIsSubmittingReview(true)
     try {
-      await createClientOrderReview(orderId, { rating, comment: comment.trim() })
-      toast.success("Отзыв успешно отправлен!")
+      if (existingReview?.id) {
+        await updateMyReview(existingReview.id, { rating, comment: comment.trim() })
+        toast.success("Отзыв обновлён")
+      } else {
+        await createClientOrderReview(orderId, { rating, comment: comment.trim() })
+        toast.success("Отзыв успешно отправлен!")
+      }
       router.push(`/client/order/${orderId}`)
     } catch (err) {
       const apiErr = err as ApiError
-      toast.error(apiErr.message ?? "Не удалось отправить отзыв")
+      toast.error(apiErr.message ?? "Не удалось сохранить отзыв")
+    } finally {
+      setIsSubmittingReview(false)
+    }
+  }
+
+  const handleDeleteReview = async () => {
+    if (!existingReview?.id) return
+    if (!confirm("Удалить отзыв? Это действие нельзя отменить.")) return
+    setIsSubmittingReview(true)
+    try {
+      await deleteMyReview(existingReview.id)
+      setExistingReview(null)
+      setRating(0)
+      setComment("")
+      toast.success("Отзыв удалён")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось удалить отзыв")
     } finally {
       setIsSubmittingReview(false)
     }
@@ -136,7 +160,7 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
     5: "Отлично",
   }
 
-  const reviewFormDisabled = existingReview !== null
+  const isEditing = existingReview !== null
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -222,8 +246,8 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
               <CardHeader>
                 <CardTitle>Отзыв об исполнителе</CardTitle>
                 <CardDescription>
-                  {reviewFormDisabled
-                    ? "Вы уже оставили отзыв для этого заказа"
+                  {isEditing
+                    ? "Отзыв можно изменить или удалить"
                     : "Ваша оценка поможет другим заказчикам и повлияет на рейтинг исполнителя"}
                 </CardDescription>
               </CardHeader>
@@ -235,12 +259,12 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
                   </div>
                 ) : (
                   <>
-                    {reviewFormDisabled && existingReview && (
+                    {isEditing && existingReview && (
                       <div className="flex items-center gap-2 text-blue-700 bg-blue-50 border border-blue-200 rounded-lg p-3">
                         <CheckCircle className="w-4 h-4 flex-shrink-0" />
                         <span className="text-sm">
-                          Отзыв оставлен{" "}
-                          {new Intl.DateTimeFormat(undefined, {
+                          Отзыв от{" "}
+                          {new Intl.DateTimeFormat("ru-RU", {
                             dateStyle: "medium",
                             timeStyle: "short",
                           }).format(new Date(existingReview.created_at))}
@@ -258,8 +282,7 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
                           <button
                             key={value}
                             type="button"
-                            onClick={() => !reviewFormDisabled && setRating(value)}
-                            disabled={reviewFormDisabled}
+                            onClick={() => setRating(value)}
                             className="focus:outline-none disabled:cursor-not-allowed"
                             aria-label={`Оценка ${value}`}
                           >
@@ -268,7 +291,7 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
                                 value <= rating
                                   ? "text-yellow-500 fill-current"
                                   : "text-gray-300 hover:text-yellow-400"
-                              } ${reviewFormDisabled ? "opacity-70" : ""}`}
+                              }`}
                             />
                           </button>
                         ))}
@@ -288,37 +311,44 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
                         rows={4}
                         value={comment}
                         onChange={(e) => setComment(e.target.value)}
-                        disabled={reviewFormDisabled}
-                        className={reviewFormDisabled ? "opacity-70 cursor-not-allowed" : ""}
                       />
-                      {!reviewFormDisabled && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Обязательное поле. Ваш отзыв будет виден другим пользователям.
-                        </p>
-                      )}
+                      <p className="text-xs text-gray-500 mt-1">
+                        Обязательное поле. Ваш отзыв будет виден другим пользователям.
+                      </p>
                     </div>
 
-                    {/* Submit button */}
-                    {!reviewFormDisabled && (
+                    <div className="flex flex-col sm:flex-row gap-3">
                       <Button
                         onClick={handleSubmitReview}
-                        className="w-full bg-blue-600 hover:bg-blue-700"
+                        className="flex-1 bg-blue-600 hover:bg-blue-700"
                         size="lg"
                         disabled={isSubmittingReview || rating === 0 || !comment.trim()}
                       >
                         {isSubmittingReview ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Отправка...
+                            Сохранение...
                           </>
                         ) : (
                           <>
                             <Award className="w-4 h-4 mr-2" />
-                            Отправить отзыв
+                            {isEditing ? "Сохранить изменения" : "Отправить отзыв"}
                           </>
                         )}
                       </Button>
-                    )}
+                      {isEditing && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="lg"
+                          className="text-red-600 hover:text-red-700"
+                          disabled={isSubmittingReview}
+                          onClick={() => void handleDeleteReview()}
+                        >
+                          Удалить отзыв
+                        </Button>
+                      )}
+                    </div>
                   </>
                 )}
               </CardContent>

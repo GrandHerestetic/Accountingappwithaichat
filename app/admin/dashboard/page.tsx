@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, Briefcase, AlertTriangle, Shield, Loader2 } from "lucide-react"
+import { Users, Briefcase, AlertTriangle, Shield, Loader2, BookOpen } from "lucide-react"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
@@ -93,6 +93,12 @@ export default function AdminDashboard() {
                     <Button variant="outline" className="w-full justify-start">
                       <Briefcase className="w-4 h-4 mr-2" />
                       Заказы
+                    </Button>
+                  </Link>
+                  <Link href="/admin/course-assignments">
+                    <Button variant="outline" className="w-full justify-start">
+                      <BookOpen className="w-4 h-4 mr-2" />
+                      Назначение курсов ({stats.courseAssignments})
                     </Button>
                   </Link>
                   <Link href="/admin/users">

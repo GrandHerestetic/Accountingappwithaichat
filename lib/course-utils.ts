@@ -35,6 +35,13 @@ export function computeCourseStats(courses: Course[]) {
   return { total, published, draft, archived, publishedShare }
 }
 
+export const ASSIGNMENT_SOURCE_LABELS: Record<string, string> = {
+  manual_admin: "Назначение администратором",
+  sanction_low_rating_first: "Санкция (первое нарушение)",
+  sanction_low_rating_repeat: "Санкция (повторное нарушение)",
+  self_enroll: "Самостоятельная запись",
+}
+
 export function isAssignmentActive(status: AssignmentStatus): boolean {
   return status === "assigned" || status === "in_progress" || status === "overdue"
 }
