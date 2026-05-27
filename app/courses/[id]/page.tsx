@@ -12,6 +12,7 @@ import type { Course, CourseMaterial } from "@/lib/api/types"
 import { toast } from "sonner"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
+import { COURSE_STATUS_LABELS, sortMaterials } from "@/lib/course-utils"
 
 export default function CourseDetailPage() {
   const params = useParams()
@@ -28,7 +29,7 @@ export default function CourseDetailPage() {
       try {
         const detail = await getCourseDetail(courseId)
         setCourse(detail.course)
-        setMaterials(detail.materials ?? [])
+        setMaterials(sortMaterials(detail.materials ?? []))
       } catch (err) {
         const message = err instanceof Error ? err.message : "Не удалось загрузить курс"
         toast.error(message)
@@ -165,19 +166,16 @@ export default function CourseDetailPage() {
 
           <div className="space-y-4 max-w-3xl">
             <div className="flex flex-wrap gap-2">
-              <Badge className="bg-white/20 hover:bg-white/30">{course.category}</Badge>
               <Badge
                 className={
                   course.status === "published"
                     ? "bg-green-500/80 hover:bg-green-500"
-                    : "bg-gray-500/80 hover:bg-gray-500"
+                    : course.status === "draft"
+                      ? "bg-gray-500/80 hover:bg-gray-500"
+                      : "bg-slate-500/80 hover:bg-slate-500"
                 }
               >
-                {course.status === "published"
-                  ? "Опубликован"
-                  : course.status === "draft"
-                  ? "Черновик"
-                  : "Архив"}
+                {COURSE_STATUS_LABELS[course.status]}
               </Badge>
             </div>
 

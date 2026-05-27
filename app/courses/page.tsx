@@ -8,18 +8,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search, Filter, X, BookOpen, Loader2 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
+import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { listCourses } from "@/lib/api"
 import type { Course, PaginatedResponse } from "@/lib/api/types"
 import { toast } from "sonner"
-import Link from "next/link"
+import { COURSE_STATUS_LABELS } from "@/lib/course-utils"
 
 export default function CoursesPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   const canViewCourses =
     isAuthenticated && user && ["executor", "coach", "admin"].includes(user.role)
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("all")
   const [sortBy, setSortBy] = useState("newest")
 
   const [courses, setCourses] = useState<Course[]>([])
@@ -39,9 +39,8 @@ export default function CoursesPage() {
     const fetchCourses = async () => {
       setLoading(true)
       try {
-        const data = await listCourses({ page: 1, pageSize: 20 })
-        // Display only published courses (requirement 7.1)
-        setCourses(data.items.filter((c) => c.status === "published"))
+        const data = await listCourses({ page: 1, pageSize: 50, status: "published" })
+        setCourses(data.items)
       } catch (err) {
         const message = err instanceof Error ? err.message : "Не удалось загрузить курсы"
         toast.error(message)
@@ -55,13 +54,6 @@ export default function CoursesPage() {
   // ---------------------------------------------------------------------------
   // Client-side filtering and sorting
   // ---------------------------------------------------------------------------
-  const categories = useMemo(() => {
-    const cats = Array.from(
-      new Set(courses.map((c) => c.category).filter((c): c is string => Boolean(c)))
-    )
-    return cats.sort()
-  }, [courses])
-
   const filteredCourses = useMemo(() => {
     let filtered = courses
 
@@ -70,13 +62,8 @@ export default function CoursesPage() {
       filtered = filtered.filter(
         (c) =>
           c.title.toLowerCase().includes(q) ||
-          (c.description ?? "").toLowerCase().includes(q) ||
-          (c.category ?? "").toLowerCase().includes(q)
+          (c.description ?? "").toLowerCase().includes(q)
       )
-    }
-
-    if (selectedCategory !== "all") {
-      filtered = filtered.filter((c) => c.category === selectedCategory)
     }
 
     const sorted = [...filtered]
@@ -96,15 +83,14 @@ export default function CoursesPage() {
     }
 
     return sorted
-  }, [courses, searchQuery, selectedCategory, sortBy])
+  }, [courses, searchQuery, sortBy])
 
   const clearFilters = () => {
     setSearchQuery("")
-    setSelectedCategory("all")
     setSortBy("newest")
   }
 
-  const hasActiveFilters = searchQuery || selectedCategory !== "all"
+  const hasActiveFilters = Boolean(searchQuery)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -154,21 +140,7 @@ export default function CoursesPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Категория" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все категории</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger>
                   <SelectValue placeholder="Сортировка" />
@@ -197,12 +169,6 @@ export default function CoursesPage() {
                   <Badge variant="secondary" className="flex items-center gap-1">
                     Поиск: &quot;{searchQuery}&quot;
                     <X className="h-3 w-3 cursor-pointer" onClick={() => setSearchQuery("")} />
-                  </Badge>
-                )}
-                {selectedCategory !== "all" && (
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    {selectedCategory}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedCategory("all")} />
                   </Badge>
                 )}
               </div>
@@ -237,7 +203,7 @@ export default function CoursesPage() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2 mb-2">
                     <Badge variant="outline" className="text-xs">
-                      {course.category ?? "Без категории"}
+                      {COURSE_STATUS_LABELS[course.status]}
                     </Badge>
                   </div>
                   <h3 className="font-semibold text-lg line-clamp-2 group-hover:text-blue-600 transition-colors">

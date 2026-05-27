@@ -5,25 +5,20 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BookOpen, Users, TrendingUp, Award, Plus, Eye, FileText, BarChart3, Settings } from "lucide-react"
+import { BookOpen, Archive, TrendingUp, Award, Plus, Eye, FileText, BarChart3, Settings } from "lucide-react"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/contexts/auth-context"
 import { useCoachCourses } from "@/hooks/use-swr-hooks"
+import { COURSE_STATUS_LABELS, computeCourseStats } from "@/lib/course-utils"
 
 export default function CoachDashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const { user } = useAuth()
-  const { data: coursesData } = useCoachCourses({ page: 1, pageSize: 50 })
+  const { data: coursesData, isLoading } = useCoachCourses({ page: 1, pageSize: 100 })
   const apiCourses = coursesData?.items ?? []
-
-  const publishedCount = apiCourses.filter((c) => c.status === "published").length
-  const coachStats = {
-    totalCourses: apiCourses.length,
-    publishedCourses: publishedCount,
-    completionRate: apiCourses.length ? Math.round((publishedCount / apiCourses.length) * 100) : 0,
-  }
+  const stats = computeCourseStats(apiCourses)
 
   const courses = apiCourses.map((c) => ({
     id: c.id,
@@ -34,15 +29,16 @@ export default function CoachDashboard() {
   }))
 
   const getStatusBadge = (status: string) => {
+    const label = COURSE_STATUS_LABELS[status as keyof typeof COURSE_STATUS_LABELS]
     switch (status) {
       case "published":
-        return <Badge className="bg-green-100 text-green-800">Опубликован</Badge>
+        return <Badge className="bg-green-100 text-green-800">{label}</Badge>
       case "draft":
-        return <Badge className="bg-gray-100 text-gray-800">Черновик</Badge>
-      case "review":
-        return <Badge className="bg-yellow-100 text-yellow-800">На модерации</Badge>
+        return <Badge className="bg-gray-100 text-gray-800">{label}</Badge>
+      case "archived":
+        return <Badge className="bg-slate-100 text-slate-800">{label}</Badge>
       default:
-        return <Badge variant="secondary">Неизвестно</Badge>
+        return <Badge variant="secondary">{label ?? status}</Badge>
     }
   }
 
@@ -53,11 +49,12 @@ export default function CoachDashboard() {
 
         <main className="py-8">
           <div className="container mx-auto px-4 max-w-7xl">
-            {/* Header */}
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Добро пожаловать, {user?.profile?.profile_name ?? user?.email}! 👋</h1>
-                <p className="text-gray-600">Управляйте курсами и отслеживайте прогресс студентов</p>
+                <h1 className="text-3xl font-bold text-gray-900">
+                  Добро пожаловать, {user?.profile?.profile_name ?? user?.email}! 👋
+                </h1>
+                <p className="text-gray-600">Управляйте курсами из личного кабинета коуча</p>
               </div>
               <div className="flex gap-3">
                 <Link href="/coach/courses/create">
@@ -75,14 +72,13 @@ export default function CoachDashboard() {
               </div>
             </div>
 
-            {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Всего курсов</p>
-                      <p className="text-2xl font-bold text-gray-900">{coachStats.totalCourses}</p>
+                      <p className="text-2xl font-bold text-gray-900">{isLoading ? "…" : stats.total}</p>
                     </div>
                     <div className="p-3 bg-purple-100 rounded-full">
                       <BookOpen className="w-6 h-6 text-purple-600" />
@@ -96,24 +92,10 @@ export default function CoachDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Опубликовано</p>
-                      <p className="text-2xl font-bold text-gray-900">{coachStats.publishedCourses}</p>
+                      <p className="text-2xl font-bold text-gray-900">{isLoading ? "…" : stats.published}</p>
                     </div>
                     <div className="p-3 bg-blue-100 rounded-full">
-                      <Users className="w-6 h-6 text-blue-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Процент завершения</p>
-                      <p className="text-2xl font-bold text-gray-900">{coachStats.completionRate}%</p>
-                    </div>
-                    <div className="p-3 bg-green-100 rounded-full">
-                      <TrendingUp className="w-6 h-6 text-green-600" />
+                      <TrendingUp className="w-6 h-6 text-blue-600" />
                     </div>
                   </div>
                 </CardContent>
@@ -124,7 +106,7 @@ export default function CoachDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Черновики</p>
-                      <p className="text-2xl font-bold text-gray-900">{coachStats.totalCourses - coachStats.publishedCourses}</p>
+                      <p className="text-2xl font-bold text-gray-900">{isLoading ? "…" : stats.draft}</p>
                     </div>
                     <div className="p-3 bg-yellow-100 rounded-full">
                       <Award className="w-6 h-6 text-yellow-600" />
@@ -132,9 +114,22 @@ export default function CoachDashboard() {
                   </div>
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">В архиве</p>
+                      <p className="text-2xl font-bold text-gray-900">{isLoading ? "…" : stats.archived}</p>
+                    </div>
+                    <div className="p-3 bg-slate-100 rounded-full">
+                      <Archive className="w-6 h-6 text-slate-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
-            {/* Main Content */}
             <Card>
               <CardHeader>
                 <CardTitle>Управление курсами</CardTitle>
@@ -151,7 +146,6 @@ export default function CoachDashboard() {
 
                   <TabsContent value="overview" className="space-y-6 mt-6">
                     <div className="grid gap-6 md:grid-cols-2">
-                      {/* Quick Stats */}
                       <Card>
                         <CardHeader>
                           <CardTitle className="text-lg">Быстрая статистика</CardTitle>
@@ -159,15 +153,15 @@ export default function CoachDashboard() {
                         <CardContent className="space-y-4">
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-gray-600">Всего курсов:</span>
-                            <span className="font-bold">{coachStats.totalCourses}</span>
+                            <span className="font-bold">{stats.total}</span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-gray-600">Опубликовано:</span>
-                            <span className="font-bold">{coachStats.publishedCourses}</span>
+                            <span className="font-bold">{stats.published}</span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-gray-600">Доля опубликованных:</span>
-                            <span className="font-bold">{coachStats.completionRate}%</span>
+                            <span className="font-bold">{stats.publishedShare}%</span>
                           </div>
                         </CardContent>
                       </Card>
@@ -193,15 +187,17 @@ export default function CoachDashboard() {
                       </Card>
                     </div>
 
-                    {/* Top Courses */}
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-lg">Популярные курсы</CardTitle>
+                        <CardTitle className="text-lg">Недавно обновлённые курсы</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
-                          {courses
-                            .filter((c) => c.status === "published")
+                          {[...courses]
+                            .sort(
+                              (a, b) =>
+                                new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+                            )
                             .slice(0, 3)
                             .map((course) => (
                               <div
@@ -210,10 +206,22 @@ export default function CoachDashboard() {
                               >
                                 <div className="flex-1">
                                   <h4 className="font-medium">{course.title}</h4>
-                                  <p className="text-sm text-gray-500 mt-1">Статус: {course.status}</p>
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    {COURSE_STATUS_LABELS[course.status as keyof typeof COURSE_STATUS_LABELS]} ·{" "}
+                                    {new Date(course.lastUpdated).toLocaleDateString("ru-RU")}
+                                  </p>
                                 </div>
+                                <Link href={`/courses/${course.id}`}>
+                                  <Button size="sm" variant="outline">
+                                    <Eye className="w-4 h-4 mr-1" />
+                                    Открыть
+                                  </Button>
+                                </Link>
                               </div>
                             ))}
+                          {courses.length === 0 && !isLoading && (
+                            <p className="text-sm text-gray-500 text-center py-6">Курсов пока нет</p>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -259,7 +267,9 @@ export default function CoachDashboard() {
                   <TabsContent value="analytics" className="space-y-4 mt-6">
                     <Card>
                       <CardContent className="py-10 text-center">
-                        <p className="text-gray-600 mb-4">Подробная аналитика доступна на отдельной странице</p>
+                        <p className="text-gray-600 mb-4">
+                          Подробная аналитика по студентам недоступна в текущем API
+                        </p>
                         <Link href="/coach/analytics">
                           <Button className="bg-purple-600 hover:bg-purple-700">
                             <BarChart3 className="w-4 h-4 mr-2" />
@@ -272,11 +282,11 @@ export default function CoachDashboard() {
 
                   <TabsContent value="students" className="space-y-4 mt-6">
                     <div className="text-center py-8">
-                      <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">Управление студентами</h3>
-                      <p className="text-gray-600 mb-6">Просматривайте прогресс студентов и выдавайте сертификаты</p>
+                      <p className="text-gray-600 mb-6">
+                        Назначение студентов на курсы выполняется администратором через API assignments
+                      </p>
                       <Link href="/coach/students">
-                        <Button className="bg-purple-600 hover:bg-purple-700">Посмотреть всех студентов</Button>
+                        <Button className="bg-purple-600 hover:bg-purple-700">Перейти к курсам</Button>
                       </Link>
                     </div>
                   </TabsContent>

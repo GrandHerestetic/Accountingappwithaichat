@@ -270,7 +270,12 @@ export interface Course {
 
 export interface CreateCourseRequest {
   title: string
-  description: string
+  description?: string
+}
+
+export interface StorageUploadResponse {
+  download_url: string
+  path: string
 }
 
 export interface UpdateCourseRequest {
@@ -290,21 +295,50 @@ export interface CourseMaterial {
   title: string
   url: string | null
   content: string | null
+  position?: number
+  storage_path?: string | null
   created_at: string
+  updated_at?: string
 }
+
+export interface CourseProgress {
+  id?: string
+  assignment_id: string
+  executor_id: string
+  progress_percent: number
+  status: AssignmentStatus
+  completed_materials: number
+  total_materials: number
+  completed_material_ids?: string[]
+  completed_at?: string | null
+  last_activity_at?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type AssignmentStatus =
+  | "assigned"
+  | "in_progress"
+  | "completed"
+  | "overdue"
+  | "cancelled"
 
 export interface CourseAssignment {
   id: string
   course_id: string
   executor_id: string
-  status: "active" | "completed" | "cancelled"
-  source?:
-    | "manual_admin"
-    | "sanction_low_rating_first"
-    | "sanction_low_rating_repeat"
-  assigned_by: string | null
+  status: AssignmentStatus
+  source: string
+  reason?: string | null
+  sanction_id?: string | null
+  assigned_at: string
+  assigned_by?: string | null
+  completed_at?: string | null
+  due_at?: string | null
   created_at: string
   updated_at: string
+  course?: Course
+  progress?: CourseProgress
 }
 
 // Reviews & rating

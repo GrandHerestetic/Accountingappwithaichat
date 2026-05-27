@@ -24,6 +24,7 @@ export default function WalletPage() {
   >([])
 
   const { data, isLoading, error } = useMyWallet()
+  const walletUnavailable = error instanceof Error && /недоступен|501|not_implemented/i.test(error.message)
 
   const balance = data?.wallet.balance ?? 0
   const currency = data?.wallet.currency ?? "KZT"
@@ -42,10 +43,10 @@ export default function WalletPage() {
   )
 
   useEffect(() => {
-    if (error) {
+    if (error && !walletUnavailable) {
       toast.error(error instanceof Error ? error.message : "Не удалось загрузить кошелёк")
     }
-  }, [error])
+  }, [error, walletUnavailable])
 
   const applyFilters = () => {
     let filtered = [...transactions]
@@ -101,6 +102,17 @@ export default function WalletPage() {
             <p className="text-gray-600">Баланс и история операций с сервера</p>
           </div>
 
+          {walletUnavailable && (
+            <Card className="mb-8 border-amber-200 bg-amber-50">
+              <CardContent className="p-6 text-amber-900">
+                Кошелёк пока не подключён в API v2. Оплата откликов обрабатывается через dev-payments на
+                стороне бэкенда.
+              </CardContent>
+            </Card>
+          )}
+
+          {!walletUnavailable && (
+          <>
           <Card className="mb-8 bg-gradient-to-r from-green-600 to-blue-600 text-white border-0">
             <CardContent className="p-8">
               <div className="flex items-center gap-3 mb-2">
@@ -223,6 +235,8 @@ export default function WalletPage() {
               </div>
             </CardContent>
           </Card>
+          </>
+          )}
         </div>
       </main>
     </div>

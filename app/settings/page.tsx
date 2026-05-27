@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { PushNotificationSetup } from "@/components/push-notification-setup"
 import { User, Bell, Save, Loader2 } from "lucide-react"
 import { useEffect, useState } from "react"
-import { clearProfileAvatar, getProfile, setProfileAvatar, updateProfile, uploadFiles } from "@/lib/api"
+import { getProfile, updateProfile, uploadProfileAvatar } from "@/lib/api"
 import { FileUploadField } from "@/components/file-upload-field"
 import { useAuth } from "@/contexts/auth-context"
 import { FormField, fieldAriaProps, fieldInputClass } from "@/components/form-field"
@@ -61,26 +61,12 @@ export default function SettingsPage() {
     if (!avatarFile) return
     setAvatarSaving(true)
     try {
-      const [upload] = await uploadFiles([avatarFile])
-      await setProfileAvatar(upload.id)
+      await uploadProfileAvatar(avatarFile)
       await refreshUser()
       setAvatarFile(null)
       toast.success("Аватар обновлён")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Ошибка загрузки аватара")
-    } finally {
-      setAvatarSaving(false)
-    }
-  }
-
-  const handleAvatarClear = async () => {
-    setAvatarSaving(true)
-    try {
-      await clearProfileAvatar()
-      await refreshUser()
-      toast.success("Аватар удалён")
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Ошибка")
     } finally {
       setAvatarSaving(false)
     }
@@ -158,17 +144,6 @@ export default function SettingsPage() {
                     >
                       {avatarSaving ? "Загрузка..." : "Применить аватар"}
                     </Button>
-                    {user?.profile?.avatar_url && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={avatarSaving}
-                        onClick={handleAvatarClear}
-                      >
-                        Удалить аватар
-                      </Button>
-                    )}
                   </div>
                 </div>
                 <FormField label="Email">

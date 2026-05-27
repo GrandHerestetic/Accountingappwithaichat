@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -20,10 +21,25 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { createOrderResponse, getOrder, submitMyResponse, uploadAndAttach } from "@/lib/api"
-import type { Order } from "@/lib/api/types"
+import { getOrder, listMyOrderResponses, saveOrderResponseDraft, submitMyResponse, uploadAndAttach } from "@/lib/api"
+import type { Order, OrderResponse } from "@/lib/api/types"
+import { ApiError } from "@/lib/api/types"
+
+const DEADLINE_MARKER = "\n\nПредлагаемый срок: "
+
+function parseCoverLetter(coverLetter: string): { message: string; deadline: string } {
+  const idx = coverLetter.lastIndexOf(DEADLINE_MARKER)
+  if (idx === -1) {
+    return { message: coverLetter, deadline: "" }
+  }
+  return {
+    message: coverLetter.slice(0, idx),
+    deadline: coverLetter.slice(idx + DEADLINE_MARKER.length).trim(),
+  }
+}
 
 export default function ResponseToOrderPage({ params }: { params: { id: string } }) {
+  const router = useRouter()
   const [responseData, setResponseData] = useState({
     price: "",
     deadline: "",
@@ -31,24 +47,56 @@ export default function ResponseToOrderPage({ params }: { params: { id: string }
     attachments: [] as File[],
   })
   const [order, setOrder] = useState<Order | null>(null)
+  const [existingResponse, setExistingResponse] = useState<OrderResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
   // ── Req 4.1: fetch order details ──────────────────────────────────────────
   useEffect(() => {
     const fetchOrder = async () => {
+      let redirectToResponses = false
       try {
-        const data = await getOrder(params.id)
+        const [data, myResponses] = await Promise.all([
+          getOrder(params.id),
+          listMyOrderResponses(params.id).catch(() => ({ items: [] as OrderResponse[] })),
+        ])
         setOrder(data)
+
+        const editable = myResponses.items.find(
+          (item) => item.status === "draft" || item.status === "payment_pending"
+        )
+        const submitted = myResponses.items.find(
+          (item) =>
+            item.status === "submitted" || item.status === "accepted" || item.status === "rejected"
+        )
+
+        if (submitted && !editable) {
+          redirectToResponses = true
+          router.replace("/executor/responses")
+          return
+        }
+
+        if (editable) {
+          setExistingResponse(editable)
+          const { message, deadline } = parseCoverLetter(editable.cover_letter)
+          setResponseData({
+            price: String(editable.proposed_amount),
+            deadline: editable.proposed_deadline?.split("T")[0] ?? deadline,
+            message,
+            attachments: [],
+          })
+        }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Не удалось загрузить заказ"
         toast.error(message)
       } finally {
-        setLoading(false)
+        if (!redirectToResponses) {
+          setLoading(false)
+        }
       }
     }
     fetchOrder()
-  }, [params.id])
+  }, [params.id, router])
 
   if (loading) {
     return (
@@ -101,6 +149,12 @@ export default function ResponseToOrderPage({ params }: { params: { id: string }
       return
     }
 
+    const trimmedMessage = responseData.message.trim()
+    if (trimmedMessage.length < 100) {
+      toast.error("Сопроводительное письмо должно быть не короче 100 символов")
+      return
+    }
+
     const proposedAmount = parseFloat(responseData.price)
     if (isNaN(proposedAmount) || proposedAmount <= 0) {
       toast.error("Укажите корректную сумму")
@@ -109,34 +163,41 @@ export default function ResponseToOrderPage({ params }: { params: { id: string }
 
     setSubmitting(true)
     try {
-      // Step 1: Create the response draft (Req 4.1)
-      const createdResponse = await createOrderResponse(params.id, {
-        proposed_amount: proposedAmount,
-        proposed_deadline: responseData.deadline,
-        cover_letter: responseData.message,
-      })
+      const savedResponse = await saveOrderResponseDraft(
+        params.id,
+        {
+          proposed_amount: proposedAmount,
+          proposed_deadline: responseData.deadline,
+          cover_letter: trimmedMessage,
+        },
+        existingResponse?.status === "draft" || existingResponse?.status === "payment_pending"
+          ? existingResponse.id
+          : undefined
+      )
 
       if (responseData.attachments.length > 0) {
         await uploadAndAttach(
           responseData.attachments,
           "response_attachment",
-          createdResponse.id
+          savedResponse.id
         )
       }
 
-      // Step 2: Submit the response for payment (Req 4.4)
-      const submitResult = await submitMyResponse(params.id, createdResponse.id)
+      const submitResult = await submitMyResponse(params.id, savedResponse.id)
 
       if (submitResult.checkout_url) {
         window.open(submitResult.checkout_url, "_blank")
-      } else {
-        toast.success("Отклик успешно отправлен! Заказчик получит уведомление.")
-        window.location.href = "/executor/responses"
       }
+
+      toast.success("Отклик успешно отправлен!")
+      router.push("/executor/responses")
     } catch (err: unknown) {
-      // Req 4.9: error toast on API failure
-      const message = err instanceof Error ? err.message : "Не удалось отправить отклик"
-      toast.error(message)
+      if (err instanceof ApiError && err.status === 409) {
+        toast.error("У вас уже есть отклик на этот заказ. Откройте «Мои отклики» для редактирования.")
+      } else {
+        const message = err instanceof Error ? err.message : "Не удалось отправить отклик"
+        toast.error(message)
+      }
     } finally {
       setSubmitting(false)
     }
@@ -215,6 +276,12 @@ export default function ResponseToOrderPage({ params }: { params: { id: string }
                   <CardDescription>Заполните форму отклика. Будьте конкретны и профессиональны.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  {existingResponse?.status === "draft" || existingResponse?.status === "payment_pending" ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                      У вас уже есть черновик отклика на этот заказ. Изменения будут сохранены в существующий
+                      отклик.
+                    </div>
+                  ) : null}
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="price">Ваша цена (₸) *</Label>
@@ -306,7 +373,11 @@ export default function ResponseToOrderPage({ params }: { params: { id: string }
                     size="lg"
                     disabled={submitting}
                   >
-                    {submitting ? "Отправка..." : "Отправить отклик"}
+                    {submitting
+                      ? "Отправка..."
+                      : existingResponse?.status === "draft" || existingResponse?.status === "payment_pending"
+                        ? "Сохранить и отправить отклик"
+                        : "Отправить отклик"}
                   </Button>
                 </CardContent>
               </Card>

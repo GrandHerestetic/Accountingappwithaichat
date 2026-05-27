@@ -27,6 +27,8 @@ import {
   listMySanctions,
 } from "@/lib/api"
 import type { Course, Sanction } from "@/lib/api/types"
+import { COURSE_STATUS_LABELS } from "@/lib/course-utils"
+import { isAssignmentActive } from "@/lib/course-utils"
 
 export default function RatingWarningPage() {
   const { user } = useAuth()
@@ -40,9 +42,7 @@ export default function RatingWarningPage() {
     violationsCount: 0,
     ordersToImprove: 0,
   })
-  const [recommendedCourses, setRecommendedCourses] = useState<
-    { id: string; title: string; description: string; duration: string; price: string; rating: number; students: number; category: string }[]
-  >([])
+  const [recommendedCourses, setRecommendedCourses] = useState<Course[]>([])
 
   useEffect(() => {
     if (!user?.id) return
@@ -52,8 +52,8 @@ export default function RatingWarningPage() {
           getExecutorRating(user.id),
           getExecutorReviews(user.id, { page: 1, pageSize: 10 }),
           listMySanctions({ page: 1, pageSize: 5 }),
-          listCourses({ page: 1, pageSize: 3 }),
-          listMyCourseAssignments({ page: 1, pageSize: 10, status: "active" }),
+          listCourses({ page: 1, pageSize: 3, status: "published" }),
+          listMyCourseAssignments({ page: 1, pageSize: 10 }),
         ])
         const activeSanction = sanctions.items.find((s: Sanction) => s.status === "active")
         const ends = activeSanction?.ends_at ?? ""
@@ -74,20 +74,9 @@ export default function RatingWarningPage() {
           recentRatings: reviews.items.map((r) => r.rating),
           blockEndDate: ends,
           violationsCount: sanctions.items.filter((s) => s.status === "active").length,
-          ordersToImprove: assignments.total,
+          ordersToImprove: assignments.items.filter((a) => isAssignmentActive(a.status)).length,
         })
-        setRecommendedCourses(
-          courses.items.map((c: Course) => ({
-            id: c.id,
-            title: c.title,
-            description: c.description ?? "",
-            duration: "—",
-            price: "—",
-            rating: 0,
-            students: 0,
-            category: c.status,
-          }))
-        )
+        setRecommendedCourses(courses.items)
       } catch (e) {
         console.error(e)
       }
@@ -310,31 +299,20 @@ export default function RatingWarningPage() {
                           <div className="flex items-center gap-2 mb-2">
                             <h4 className="font-semibold">{course.title}</h4>
                             <Badge variant="outline" className="text-purple-600 border-purple-600">
-                              {course.category}
+                              {COURSE_STATUS_LABELS[course.status]}
                             </Badge>
                           </div>
                           <p className="text-sm text-gray-600 mb-3">{course.description}</p>
-                          <div className="flex items-center gap-4 text-sm text-gray-500">
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {course.duration}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                              {course.rating}
-                            </span>
-                            <span>{course.students} студентов</span>
-                          </div>
+                          <p className="text-xs text-gray-500">
+                            Добавлен: {new Date(course.created_at).toLocaleDateString("ru-RU")}
+                          </p>
                         </div>
-                        <div className="text-right ml-4">
-                          <p className="text-lg font-bold text-purple-600 mb-2">{course.price}</p>
-                          <Link href={`/courses/${course.id}`}>
-                            <Button size="sm" className="bg-purple-600 hover:bg-purple-700">
-                              Начать курс
-                              <ArrowRight className="w-4 h-4 ml-1" />
-                            </Button>
-                          </Link>
-                        </div>
+                        <Link href={`/courses/${course.id}`}>
+                          <Button size="sm" className="bg-purple-600 hover:bg-purple-700">
+                            Начать курс
+                            <ArrowRight className="w-4 h-4 ml-1" />
+                          </Button>
+                        </Link>
                       </div>
                     </CardContent>
                   </Card>

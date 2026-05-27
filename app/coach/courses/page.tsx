@@ -12,12 +12,15 @@ import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useCoachCourses } from "@/hooks/use-swr-hooks"
+import { COURSE_STATUS_LABELS, computeCourseStats } from "@/lib/course-utils"
 
 export default function CoachCoursesPage() {
   const [activeTab, setActiveTab] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState("newest")
   const { data, isLoading } = useCoachCourses({ page: 1, pageSize: 100 })
+
+  const stats = useMemo(() => computeCourseStats(data?.items ?? []), [data?.items])
 
   const courses = useMemo(() => {
     let list = data?.items ?? []
@@ -29,7 +32,7 @@ export default function CoachCoursesPage() {
       list = list.filter(
         (c) =>
           c.title.toLowerCase().includes(q) ||
-          (c.description ?? "").toLowerCase().includes(q),
+          (c.description ?? "").toLowerCase().includes(q)
       )
     }
     return [...list].sort((a, b) => {
@@ -38,26 +41,17 @@ export default function CoachCoursesPage() {
     })
   }, [data?.items, activeTab, searchQuery, sortBy])
 
-  const totalStats = useMemo(() => {
-    const all = data?.items ?? []
-    return {
-      totalCourses: all.length,
-      publishedCourses: all.filter((c) => c.status === "published").length,
-    }
-  }, [data?.items])
-
   const getStatusBadge = (status: string) => {
+    const label = COURSE_STATUS_LABELS[status as keyof typeof COURSE_STATUS_LABELS] ?? status
     switch (status) {
       case "published":
-        return <Badge className="bg-green-100 text-green-800">Опубликован</Badge>
+        return <Badge className="bg-green-100 text-green-800">{label}</Badge>
       case "draft":
-        return <Badge className="bg-gray-100 text-gray-800">Черновик</Badge>
-      case "review":
-        return <Badge className="bg-yellow-100 text-yellow-800">На модерации</Badge>
-      case "rejected":
-        return <Badge className="bg-red-100 text-red-800">Отклонен</Badge>
+        return <Badge className="bg-gray-100 text-gray-800">{label}</Badge>
+      case "archived":
+        return <Badge className="bg-slate-100 text-slate-800">{label}</Badge>
       default:
-        return <Badge variant="secondary">{status}</Badge>
+        return <Badge variant="secondary">{label}</Badge>
     }
   }
 
@@ -81,17 +75,29 @@ export default function CoachCoursesPage() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               <Card>
                 <CardContent className="p-6">
-                  <p className="text-sm text-gray-600">Всего курсов</p>
-                  <p className="text-2xl font-bold">{totalStats.totalCourses}</p>
+                  <p className="text-sm text-gray-600">Всего</p>
+                  <p className="text-2xl font-bold">{stats.total}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
                   <p className="text-sm text-gray-600">Опубликовано</p>
-                  <p className="text-2xl font-bold">{totalStats.publishedCourses}</p>
+                  <p className="text-2xl font-bold">{stats.published}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <p className="text-sm text-gray-600">Черновики</p>
+                  <p className="text-2xl font-bold">{stats.draft}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <p className="text-sm text-gray-600">В архиве</p>
+                  <p className="text-2xl font-bold">{stats.archived}</p>
                 </CardContent>
               </Card>
             </div>
@@ -124,7 +130,7 @@ export default function CoachCoursesPage() {
                     <TabsTrigger value="all">Все</TabsTrigger>
                     <TabsTrigger value="published">Опубликованные</TabsTrigger>
                     <TabsTrigger value="draft">Черновики</TabsTrigger>
-                    <TabsTrigger value="review">На модерации</TabsTrigger>
+                    <TabsTrigger value="archived">Архив</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value={activeTab} className="space-y-4 mt-6">
@@ -139,7 +145,7 @@ export default function CoachCoursesPage() {
                         <p className="text-gray-600 mb-6">
                           {activeTab === "all"
                             ? "У вас пока нет созданных курсов"
-                            : `Нет курсов со статусом «${activeTab}»`}
+                            : `Нет курсов со статусом «${COURSE_STATUS_LABELS[activeTab as keyof typeof COURSE_STATUS_LABELS] ?? activeTab}»`}
                         </p>
                         <Link href="/coach/courses/create">
                           <Button className="bg-purple-600 hover:bg-purple-700">

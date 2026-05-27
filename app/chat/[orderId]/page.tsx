@@ -11,14 +11,10 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Send,
-  Paperclip,
   ArrowLeft,
   Calendar,
-  Upload,
   AlertCircle,
   Loader2,
-  Pencil,
-  Trash2,
   CheckCircle,
 } from "lucide-react"
 import Link from "next/link"
@@ -26,7 +22,7 @@ import { toast } from "sonner"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useChat } from "@/hooks/use-chat"
-import { getMyChat, listMyChats, markChatRead, uploadFiles } from "@/lib/api"
+import { getMyChat, listMyChats, markChatRead } from "@/lib/api"
 import type { Chat } from "@/lib/api/types"
 
 export default function OrderChatPage({ params }: { params: { orderId: string } }) {
@@ -35,16 +31,11 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
   const [chat, setChat] = useState<Chat | null>(null)
   const [loadingChat, setLoadingChat] = useState(true)
   const [sendError, setSendError] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editText, setEditText] = useState("")
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const [chatId, setChatId] = useState<string | null>(null)
 
-  const { messages, sendMessage, editMessage, removeMessage, handleTyping, isConnected, error } =
-    useChat({
+  const { messages, sendMessage, handleTyping, isConnected, error } = useChat({
     chatId: chatId ?? "",
     userId: user?.id ?? "",
   })
@@ -112,31 +103,6 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
     }
   }
 
-  const handleUploadFiles = () => {
-    if (!chatId) {
-      toast.error("Чат ещё загружается")
-      return
-    }
-    fileInputRef.current?.click()
-  }
-
-  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? [])
-    if (!files.length || !chatId) return
-    setUploading(true)
-    try {
-      const uploads = await uploadFiles(files)
-      const ids = uploads.map((u) => u.id)
-      await sendMessage("", ids)
-      toast.success(files.length === 1 ? "Файл отправлен" : `Отправлено файлов: ${files.length}`)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Не удалось загрузить файлы")
-    } finally {
-      setUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ""
-    }
-  }
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "in_progress":
@@ -197,27 +163,6 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
                       )}
 
                       <div className="pt-4 border-t space-y-2">
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          className="hidden"
-                          multiple
-                          accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-                          onChange={handleFilesSelected}
-                        />
-                        <Button
-                          className="w-full"
-                          variant="outline"
-                          onClick={handleUploadFiles}
-                          disabled={uploading || !chatId}
-                        >
-                          {uploading ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          ) : (
-                            <Upload className="w-4 h-4 mr-2" />
-                          )}
-                          Загрузить файлы
-                        </Button>
                         {chat?.order_id && (
                           <Link href={`/orders/${chat.order_id}`}>
                             <Button className="w-full" variant="outline">
@@ -275,7 +220,6 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
                     {messages.map((msg) => {
                       const isMe = msg.sender_id === user?.id
                       const isDeleted = Boolean(msg.deleted_at)
-                      const isEditing = editingId === msg.id
                       return (
                         <div
                           key={msg.id}
@@ -288,46 +232,7 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
                                 : "bg-white border border-gray-200"
                             } ${isDeleted ? "opacity-60 italic" : ""}`}
                           >
-                            {isEditing ? (
-                              <div className="space-y-2">
-                                <Input
-                                  value={editText}
-                                  onChange={(e) => setEditText(e.target.value)}
-                                  className="text-sm text-gray-900"
-                                />
-                                <div className="flex gap-1">
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    className="h-7 text-xs"
-                                    onClick={() => {
-                                      editMessage(msg.id, editText)
-                                        .then(() => {
-                                          setEditingId(null)
-                                          toast.success("Сохранено")
-                                        })
-                                        .catch((err) =>
-                                          toast.error(
-                                            err instanceof Error ? err.message : "Ошибка"
-                                          )
-                                        )
-                                    }}
-                                  >
-                                    OK
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-7 text-xs"
-                                    onClick={() => setEditingId(null)}
-                                  >
-                                    Отмена
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <p className="text-sm">{msg.content}</p>
-                            )}
+                            <p className="text-sm">{msg.content}</p>
                             <div className="flex items-center justify-end gap-1 mt-1 flex-wrap">
                               {msg.edited_at && !isDeleted && (
                                 <span className={`text-xs ${isMe ? "text-green-100" : "text-gray-400"}`}>
@@ -344,39 +249,6 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
                                   minute: "2-digit",
                                 })}
                               </span>
-                              {isMe && !isDeleted && !isEditing && !msg.id.startsWith("temp-") && (
-                                <>
-                                  <button
-                                    type="button"
-                                    className="p-0.5 opacity-70 hover:opacity-100"
-                                    onClick={() => {
-                                      setEditingId(msg.id)
-                                      setEditText(
-                                        msg.content === "Сообщение удалено" ? "" : msg.content
-                                      )
-                                    }}
-                                    aria-label="Редактировать"
-                                  >
-                                    <Pencil className="w-3 h-3" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="p-0.5 opacity-70 hover:opacity-100"
-                                    onClick={() => {
-                                      if (confirm("Удалить сообщение?")) {
-                                        removeMessage(msg.id).catch((err) =>
-                                          toast.error(
-                                            err instanceof Error ? err.message : "Ошибка"
-                                          )
-                                        )
-                                      }
-                                    }}
-                                    aria-label="Удалить"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                </>
-                              )}
                               {isMe && (
                                 <CheckCircle
                                   className={`w-3 h-3 ${

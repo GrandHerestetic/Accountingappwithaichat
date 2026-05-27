@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { UserCheck, FileText, Award, Upload, CheckCircle, ArrowRight, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { submitExecutorLead } from "@/lib/api"
+import { register } from "@/lib/api"
 import { FileUploadField } from "@/components/file-upload-field"
 
 export default function ExecutorRegister() {
@@ -102,10 +102,6 @@ export default function ExecutorRegister() {
       toast.error("Выберите хотя бы одну специализацию")
       return
     }
-    if (!documents.identity || !documents.education) {
-      toast.error("Загрузите удостоверение личности и документ об образовании")
-      return
-    }
     if (!password || password.length < 8) {
       toast.error("Пароль должен быть не менее 8 символов")
       return
@@ -113,35 +109,29 @@ export default function ExecutorRegister() {
 
     setIsLoading(true)
     try {
-      const fd = new FormData()
       const p = formData.personalInfo
       const pro = formData.professional
+      const displayName = [p.lastName, p.firstName, p.middleName].filter(Boolean).join(" ").trim()
+      const bioParts = [
+        pro.description,
+        pro.education ? `Образование: ${pro.education}` : "",
+        p.city ? `Город: ${p.city}` : "",
+        p.experience ? `Опыт: ${p.experience}` : "",
+        pro.workFormat ? `Формат: ${pro.workFormat}` : "",
+        selectedSpecializations.length
+          ? `Специализации: ${selectedSpecializations.join(", ")}`
+          : "",
+      ].filter(Boolean)
 
-      fd.append("email", p.email)
-      fd.append("password", password)
-      fd.append("first_name", p.firstName)
-      fd.append("last_name", p.lastName)
-      if (p.middleName) fd.append("middle_name", p.middleName)
-      fd.append("iin", p.iin)
-      fd.append("phone", p.phone)
-      fd.append("city", p.city)
-      fd.append("experience_level", p.experience)
-      fd.append("education", pro.education)
-      fd.append("about", pro.description)
-      fd.append("work_format", pro.workFormat)
-      if (pro.hourlyRate) fd.append("hourly_rate", pro.hourlyRate)
-      fd.append("terms_accepted", "true")
-      for (const spec of selectedSpecializations) {
-        fd.append("specializations", spec)
-      }
-      fd.append("identity_document", documents.identity)
-      fd.append("education_document", documents.education)
-      if (documents.ipRegistration) {
-        fd.append("ip_registration_document", documents.ipRegistration)
-      }
+      await register({
+        email: p.email.trim(),
+        password,
+        role: "executor",
+        profile_name: displayName || p.email.trim(),
+        phone: p.phone.trim(),
+      })
 
-      const result = await submitExecutorLead(fd)
-      toast.success(result.message || "Заявка отправлена на модерацию")
+      toast.success("Аккаунт создан. Войдите в систему.")
       router.push("/auth/login")
     } catch (error) {
       console.error("Registration error:", error)

@@ -18,9 +18,9 @@ export function normalizeMeResponse(data: MeResponse | Record<string, unknown>):
       id: String(root.id ?? ""),
       email: String(root.email ?? ""),
       role: root.role as UserProfile["role"],
-      is_active: root.is_active as boolean | undefined,
-      created_at: root.created_at as string | undefined,
-      verification_status: root.verification_status as UserProfile["verification_status"],
+      is_active: Boolean(root.is_active ?? true),
+      created_at: (root.created_at as string) ?? new Date().toISOString(),
+      verification_status: (root.verification_status as UserProfile["verification_status"]) ?? undefined,
     } satisfies MeResponse["user"])
   const profile = (root.profile ?? {}) as Record<string, unknown>
   return {

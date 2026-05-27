@@ -148,18 +148,29 @@ export function useCourseAssignments(params?: {
   const searchParams = new URLSearchParams()
   searchParams.set("page", String(params?.page ?? 1))
   searchParams.set("page_size", String(params?.pageSize ?? 20))
-  if (params?.status) searchParams.set("status", params.status)
 
-  return useSWR<PaginatedResponse<CourseAssignment>>(
+  const swr = useSWR<PaginatedResponse<CourseAssignment>>(
     ["course-assignments", searchParams.toString()],
     () =>
       listMyCourseAssignments({
         page: params?.page,
         pageSize: params?.pageSize,
-        status: params?.status,
       }),
     { revalidateOnFocus: true }
   )
+
+  const filtered = params?.status
+    ? {
+        ...swr.data,
+        items: (swr.data?.items ?? []).filter((a) =>
+          params.status === "active"
+            ? a.status === "assigned" || a.status === "in_progress" || a.status === "overdue"
+            : a.status === params.status
+        ),
+      }
+    : swr.data
+
+  return { ...swr, data: filtered }
 }
 
 // ─── User Profile ─────────────────────────────────────────────────────────────
@@ -193,5 +204,8 @@ export function useAdminSanctions(params?: { page?: number; pageSize?: number })
 }
 
 export function useMyWallet() {
-  return useSWR<WalletResponse>("my-wallet", getMyWallet, { revalidateOnFocus: true })
+  return useSWR<WalletResponse>("my-wallet", getMyWallet, {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  })
 }

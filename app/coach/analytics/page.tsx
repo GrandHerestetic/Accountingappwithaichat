@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useCoachCourses } from "@/hooks/use-swr-hooks"
+import { COURSE_STATUS_LABELS, computeCourseStats } from "@/lib/course-utils"
 
 export default function CoachAnalyticsPage() {
   const { data, isLoading } = useCoachCourses({ page: 1, pageSize: 100 })
   const courses = data?.items ?? []
-  const published = courses.filter((c) => c.status === "published")
+  const stats = computeCourseStats(courses)
 
   return (
     <ProtectedRoute allowedRoles={["coach"]}>
@@ -23,7 +24,7 @@ export default function CoachAnalyticsPage() {
           <div className="container mx-auto px-4 max-w-5xl">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900">Аналитика курсов</h1>
-              <p className="text-gray-600">Сводка по вашим курсам из личного кабинета</p>
+              <p className="text-gray-600">Сводка по вашим курсам из API коуча</p>
             </div>
 
             {isLoading ? (
@@ -32,23 +33,29 @@ export default function CoachAnalyticsPage() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                   <Card>
                     <CardContent className="p-6">
-                      <p className="text-sm text-gray-600">Всего курсов</p>
-                      <p className="text-3xl font-bold">{courses.length}</p>
+                      <p className="text-sm text-gray-600">Всего</p>
+                      <p className="text-3xl font-bold">{stats.total}</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-6">
                       <p className="text-sm text-gray-600">Опубликовано</p>
-                      <p className="text-3xl font-bold">{published.length}</p>
+                      <p className="text-3xl font-bold">{stats.published}</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-6">
                       <p className="text-sm text-gray-600">Черновики</p>
-                      <p className="text-3xl font-bold">{courses.length - published.length}</p>
+                      <p className="text-3xl font-bold">{stats.draft}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-6">
+                      <p className="text-sm text-gray-600">Доля опубликованных</p>
+                      <p className="text-3xl font-bold">{stats.publishedShare}%</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -57,8 +64,7 @@ export default function CoachAnalyticsPage() {
                   <CardHeader>
                     <CardTitle>Курсы</CardTitle>
                     <CardDescription>
-                      Детальная аналитика по студентам и доходам появится после подключения соответствующих
-                      эндпоинтов API
+                      Прогресс студентов и доходы недоступны — в API нет отдельного analytics-эндпоинта
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -83,7 +89,9 @@ export default function CoachAnalyticsPage() {
                             </p>
                           </div>
                           <div className="flex items-center gap-3">
-                            <Badge variant="secondary">{course.status}</Badge>
+                            <Badge variant="secondary">
+                              {COURSE_STATUS_LABELS[course.status]}
+                            </Badge>
                             <Link href={`/courses/${course.id}`}>
                               <Button size="sm" variant="outline">
                                 Открыть

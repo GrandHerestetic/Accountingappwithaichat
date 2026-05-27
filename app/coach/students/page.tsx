@@ -9,6 +9,7 @@ import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useCoachCourses } from "@/hooks/use-swr-hooks"
+import { COURSE_STATUS_LABELS } from "@/lib/course-utils"
 
 export default function CoachStudentsPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -30,8 +31,8 @@ export default function CoachStudentsPage() {
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900">Студенты</h1>
               <p className="text-gray-600">
-                Список студентов по курсам будет доступен после появления соответствующего API. Пока вы можете
-                управлять курсами и просматривать их в каталоге.
+                Список студентов по курсам недоступен в текущем API. Ниже — ваши курсы из личного кабинета
+                коуча.
               </p>
             </div>
 
@@ -76,7 +77,9 @@ export default function CoachStudentsPage() {
                       <CardDescription>{course.description || "Без описания"}</CardDescription>
                     </CardHeader>
                     <CardContent className="flex justify-between items-center">
-                      <p className="text-sm text-gray-500">Статус: {course.status}</p>
+                      <p className="text-sm text-gray-500">
+                        {COURSE_STATUS_LABELS[course.status as keyof typeof COURSE_STATUS_LABELS]}
+                      </p>
                       <Link href={`/courses/${course.id}`}>
                         <Button variant="outline" size="sm">
                           Открыть курс

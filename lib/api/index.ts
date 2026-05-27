@@ -33,14 +33,15 @@ import type {
   ReorderAttachmentsRequest,
   Sanction,
   Selection,
-  SetAvatarRequest,
   UpdateCourseRequest,
   UpdateOrderRequest,
   UpdateProfileRequest,
   UpdateResponseRequest,
   UserProfile,
   WalletResponse,
+  StorageUploadResponse,
 } from "./types"
+import { ApiError } from "./types"
 
 export type ListParams = {
   page?: number
@@ -74,15 +75,16 @@ export async function updateProfile(body: UpdateProfileRequest): Promise<Profile
   })
 }
 
-export async function setProfileAvatar(uploadId: string): Promise<void> {
-  await apiRequest("/api/v1/profile/avatar", {
-    method: "PATCH",
-    body: JSON.stringify({ upload_id: uploadId } satisfies SetAvatarRequest),
-  })
+/** Multipart upload — POST /api/v1/profile/avatar */
+export async function uploadProfileAvatar(file: File): Promise<StorageUploadResponse> {
+  const formData = new FormData()
+  formData.append("file", file)
+  return apiFormRequest<StorageUploadResponse>("/api/v1/profile/avatar", formData)
 }
 
+/** @deprecated Backend v2 has no DELETE avatar endpoint */
 export async function clearProfileAvatar(): Promise<void> {
-  await apiRequest("/api/v1/profile/avatar", { method: "DELETE" })
+  throw new ApiError("Удаление аватара недоступно в текущей версии API", 501, "not_implemented")
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
@@ -226,10 +228,12 @@ export async function listMyResponses(params?: ListParams): Promise<PaginatedRes
   )
 }
 
-export async function createOrderResponse(
-  orderId: string,
-  body: { proposed_amount: number; cover_letter: string; currency?: string; proposed_deadline?: string }
-): Promise<{ id: string; status: string }> {
+function buildResponsePayload(body: {
+  proposed_amount: number
+  cover_letter: string
+  currency?: string
+  proposed_deadline?: string
+}) {
   let coverLetter = body.cover_letter.trim()
   if (body.proposed_deadline?.trim()) {
     const deadlineLabel = body.proposed_deadline.includes("T")
@@ -237,14 +241,47 @@ export async function createOrderResponse(
       : body.proposed_deadline
     coverLetter = `${coverLetter}\n\nПредлагаемый срок: ${deadlineLabel}`
   }
+  return {
+    proposed_amount: body.proposed_amount,
+    cover_letter: coverLetter,
+    currency: body.currency ?? "KZT",
+  }
+}
+
+export async function createOrderResponse(
+  orderId: string,
+  body: { proposed_amount: number; cover_letter: string; currency?: string; proposed_deadline?: string }
+): Promise<{ id: string; status: string }> {
   return apiRequest(`/api/v1/orders/${orderId}/responses`, {
     method: "POST",
-    body: JSON.stringify({
-      proposed_amount: body.proposed_amount,
-      cover_letter: coverLetter,
-      currency: body.currency ?? "KZT",
-    }),
+    body: JSON.stringify(buildResponsePayload(body)),
   })
+}
+
+export async function saveOrderResponseDraft(
+  orderId: string,
+  body: { proposed_amount: number; cover_letter: string; currency?: string; proposed_deadline?: string },
+  existingResponseId?: string
+): Promise<{ id: string; status: string }> {
+  if (existingResponseId) {
+    const updated = await updateMyResponse(orderId, existingResponseId, body)
+    return { id: updated.id, status: updated.status }
+  }
+
+  try {
+    return await createOrderResponse(orderId, body)
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409) {
+      const existing = await listMyOrderResponses(orderId)
+      const draft = existing.items.find(
+        (item) => item.status === "draft" || item.status === "payment_pending"
+      )
+      if (!draft) throw err
+      const updated = await updateMyResponse(orderId, draft.id, body)
+      return { id: updated.id, status: updated.status }
+    }
+    throw err
+  }
 }
 
 export async function updateMyResponse(
@@ -252,7 +289,25 @@ export async function updateMyResponse(
   responseId: string,
   body: UpdateResponseRequest
 ): Promise<OrderResponse> {
-  const { proposed_deadline: _deadline, ...payload } = body
+  const payload: Record<string, unknown> = {}
+
+  if (body.proposed_amount !== undefined) {
+    payload.proposed_amount = body.proposed_amount
+  }
+  if (body.currency !== undefined) {
+    payload.currency = body.currency
+  }
+  if (body.cover_letter !== undefined) {
+    let coverLetter = body.cover_letter.trim()
+    if (body.proposed_deadline?.trim()) {
+      const deadlineLabel = body.proposed_deadline.includes("T")
+        ? new Date(body.proposed_deadline).toLocaleDateString("ru-RU")
+        : body.proposed_deadline
+      coverLetter = `${coverLetter}\n\nПредлагаемый срок: ${deadlineLabel}`
+    }
+    payload.cover_letter = coverLetter
+  }
+
   return apiRequest(`/api/v1/orders/${orderId}/responses/my/${responseId}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
@@ -302,8 +357,9 @@ export async function getMyResponse(responseId: string): Promise<OrderResponse> 
 
 // ─── Wallet ───────────────────────────────────────────────────────────────────
 
+/** @deprecated Not in backend v2 router */
 export async function getMyWallet(): Promise<WalletResponse> {
-  return apiRequest<WalletResponse>("/api/v1/my/wallet")
+  throw new ApiError("Кошелёк недоступен в текущей версии API", 501, "not_implemented")
 }
 
 export async function getAdminWallet(userId: string): Promise<WalletResponse> {
@@ -361,17 +417,24 @@ function parseUploadList(data: { items?: UploadView[] } | UploadView[]): UploadV
   return data.items ?? []
 }
 
+/** @deprecated Use uploadProfileAvatar or uploadCoachCourseMaterial */
 export async function uploadFiles(files: File[]): Promise<UploadView[]> {
   if (!files.length) return []
-  const formData = new FormData()
+  const results: UploadView[] = []
   for (const file of files) {
-    formData.append("file", file)
+    const uploaded = await uploadProfileAvatar(file)
+    results.push({
+      id: uploaded.path,
+      author_id: "",
+      file_path: uploaded.path,
+      url: uploaded.download_url,
+      original_name: file.name,
+      mime_type: file.type || "application/octet-stream",
+      size_bytes: file.size,
+      created_at: new Date().toISOString(),
+    })
   }
-  const data = await apiFormRequest<{ items: UploadView[] } | UploadView[]>(
-    "/api/v1/files",
-    formData
-  )
-  return parseUploadList(data)
+  return results
 }
 
 export async function listMyFiles(): Promise<UploadView[]> {
@@ -441,10 +504,15 @@ export async function uploadAndAttach(
   return uploads
 }
 
+/** @deprecated Use register() with role executor */
 export async function submitExecutorLead(
-  formData: FormData
+  _formData: FormData
 ): Promise<ExecutorLeadSubmittedResponse> {
-  return apiFormRequest<ExecutorLeadSubmittedResponse>("/api/v1/leads/executor", formData)
+  throw new ApiError(
+    "Регистрация через заявку отключена. Используйте стандартную регистрацию исполнителя.",
+    501,
+    "not_implemented"
+  )
 }
 
 // ─── Chats ────────────────────────────────────────────────────────────────────
@@ -483,29 +551,33 @@ export async function sendChatMessage(
   body: import("./types").SendMessageRequest | string,
   currentUserId?: string
 ): Promise<import("./types").ChatMessage> {
-  const payload = typeof body === "string" ? { text: body } : body
+  const text =
+    typeof body === "string"
+      ? body.trim()
+      : (body.text ?? "").trim()
+  if (!text) {
+    throw new ApiError("Текст сообщения обязателен", 400, "bad_request")
+  }
   const msg = await apiRequest<import("./types").Message>(`/api/v1/my/chats/${chatId}/messages`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ text }),
   })
   return normalizeMessage(msg, currentUserId)
 }
 
+/** Backend v2: редактирование сообщений не поддерживается */
 export async function updateChatMessage(
-  chatId: string,
-  messageId: string,
-  text: string,
-  currentUserId?: string
+  _chatId: string,
+  _messageId: string,
+  _text: string,
+  _currentUserId?: string
 ): Promise<import("./types").ChatMessage> {
-  const msg = await apiRequest<import("./types").Message>(
-    `/api/v1/my/chats/${chatId}/messages/${messageId}`,
-    { method: "PATCH", body: JSON.stringify({ text }) }
-  )
-  return normalizeMessage(msg, currentUserId)
+  throw new ApiError("Редактирование сообщений недоступно", 501, "not_implemented")
 }
 
-export async function deleteChatMessage(chatId: string, messageId: string): Promise<void> {
-  await apiRequest(`/api/v1/my/chats/${chatId}/messages/${messageId}`, { method: "DELETE" })
+/** Backend v2: удаление сообщений не поддерживается */
+export async function deleteChatMessage(_chatId: string, _messageId: string): Promise<void> {
+  throw new ApiError("Удаление сообщений недоступно", 501, "not_implemented")
 }
 
 export async function markChatRead(chatId: string): Promise<void> {
@@ -555,6 +627,10 @@ export async function listMyNotifications(params?: ListParams & {
   )
 }
 
+export async function getMyNotification(id: string): Promise<Notification> {
+  return apiRequest<Notification>(`/api/v1/my/notifications/${id}`)
+}
+
 export async function markNotificationRead(id: string): Promise<void> {
   return apiRequest(`/api/v1/my/notifications/${id}/read`, { method: "POST" })
 }
@@ -565,9 +641,15 @@ export async function markAllNotificationsRead(): Promise<void> {
 
 // ─── Courses ──────────────────────────────────────────────────────────────────
 
-export async function listCourses(params?: ListParams): Promise<PaginatedResponse<Course>> {
+export async function listCourses(
+  params?: ListParams & { status?: string }
+): Promise<PaginatedResponse<Course>> {
   return apiRequest(
-    `/api/v1/courses${qs({ page: params?.page ?? 1, page_size: params?.pageSize ?? 20 })}`
+    `/api/v1/courses${qs({
+      page: params?.page ?? 1,
+      page_size: params?.pageSize ?? 20,
+      status: params?.status,
+    })}`
   )
 }
 
@@ -578,6 +660,21 @@ export async function getCourseDetail(id: string): Promise<CourseDetailResponse>
 export async function getCourse(id: string): Promise<Course> {
   const data = await getCourseDetail(id)
   return data.course
+}
+
+export async function getCoursesByIds(ids: string[]): Promise<Map<string, Course>> {
+  const uniqueIds = [...new Set(ids.filter(Boolean))]
+  const entries = await Promise.all(
+    uniqueIds.map(async (id) => {
+      try {
+        const detail = await getCourseDetail(id)
+        return [id, detail.course] as const
+      } catch {
+        return null
+      }
+    })
+  )
+  return new Map(entries.filter((entry): entry is [string, Course] => entry !== null))
 }
 
 export async function getCourseMaterials(id: string): Promise<CourseMaterial[]> {
@@ -592,7 +689,14 @@ export async function listCoachCourses(params?: ListParams): Promise<PaginatedRe
 }
 
 export async function createCoachCourse(body: CreateCourseRequest): Promise<Course> {
-  return apiRequest<Course>("/api/v1/coach/courses", { method: "POST", body: JSON.stringify(body) })
+  const payload: CreateCourseRequest = {
+    title: body.title,
+    ...(body.description?.trim() ? { description: body.description.trim() } : {}),
+  }
+  return apiRequest<Course>("/api/v1/coach/courses", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
 }
 
 export async function getCoachCourseDetail(id: string): Promise<CourseDetailResponse> {
@@ -654,18 +758,29 @@ export async function deleteCoachCourseMaterial(
   })
 }
 
+/** Multipart upload for PDF materials — POST /coach/courses/:id/materials/:materialId/upload */
+export async function uploadCoachCourseMaterial(
+  courseId: string,
+  materialId: string,
+  file: File
+): Promise<StorageUploadResponse> {
+  const formData = new FormData()
+  formData.append("file", file)
+  return apiFormRequest<StorageUploadResponse>(
+    `/api/v1/coach/courses/${courseId}/materials/${materialId}/upload`,
+    formData
+  )
+}
+
 export async function publishCoachCourse(id: string): Promise<Course> {
   return apiRequest<Course>(`/api/v1/coach/courses/${id}/publish`, { method: "POST" })
 }
 
-export async function listMyCourseAssignments(params?: ListParams & {
-  status?: string
-}): Promise<PaginatedResponse<CourseAssignment>> {
+export async function listMyCourseAssignments(params?: ListParams): Promise<PaginatedResponse<CourseAssignment>> {
   return apiRequest(
     `/api/v1/my/course-assignments${qs({
       page: params?.page ?? 1,
       page_size: params?.pageSize ?? 20,
-      status: params?.status,
     })}`
   )
 }
@@ -680,16 +795,12 @@ export async function markCourseAssignmentCompleted(id: string): Promise<void> {
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
-export async function listAdminExecutorLeads(params?: ListParams & {
-  status?: string
-}): Promise<PaginatedResponse<ExecutorLeadView>> {
-  return apiRequest(
-    `/api/v1/admin/executor-leads${qs({
-      page: params?.page ?? 1,
-      page_size: params?.pageSize ?? 20,
-      status: params?.status,
-    })}`
-  )
+/** @deprecated Not in backend v2 — returns empty list for legacy UI */
+export async function listAdminExecutorLeads(
+  params?: ListParams & { status?: string }
+): Promise<PaginatedResponse<ExecutorLeadView>> {
+  void params
+  return { items: [], page: params?.page ?? 1, page_size: params?.pageSize ?? 20, total: 0 }
 }
 
 export async function getAdminExecutorLead(id: string): Promise<ExecutorLeadView> {

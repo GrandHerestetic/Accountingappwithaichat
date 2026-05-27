@@ -8,27 +8,27 @@ import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/contexts/auth-context"
-import { listAdminExecutorLeads, listAdminSanctions, listOrders } from "@/lib/api"
+import { listAdminCourseAssignments, listAdminSanctions, listOrders } from "@/lib/api"
 
 export default function AdminDashboard() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
     orders: 0,
-    pendingLeads: 0,
+    courseAssignments: 0,
     activeSanctions: 0,
   })
 
   useEffect(() => {
     Promise.all([
       listOrders({ page: 1, pageSize: 1 }),
-      listAdminExecutorLeads({ page: 1, pageSize: 1, status: "new" }),
+      listAdminCourseAssignments({ page: 1, pageSize: 1 }),
       listAdminSanctions({ page: 1, pageSize: 50 }),
     ])
-      .then(([orders, leads, sanctions]) => {
+      .then(([orders, assignments, sanctions]) => {
         setStats({
           orders: orders.total,
-          pendingLeads: leads.total,
+          courseAssignments: assignments.total,
           activeSanctions: sanctions.items.filter((s) => s.status === "active").length,
         })
       })
@@ -59,8 +59,8 @@ export default function AdminDashboard() {
                 <Card>
                   <CardContent className="p-6">
                     <Users className="w-8 h-8 text-blue-600 mb-2" />
-                    <p className="text-2xl font-bold">{stats.pendingLeads}</p>
-                    <p className="text-sm text-gray-600">Заявок на модерацию</p>
+                    <p className="text-2xl font-bold">{stats.courseAssignments}</p>
+                    <p className="text-sm text-gray-600">Назначений курсов</p>
                   </CardContent>
                 </Card>
                 <Card>
