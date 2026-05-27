@@ -73,16 +73,30 @@ export async function updateProfile(body: UpdateProfileRequest): Promise<Profile
   })
 }
 
-/** Multipart upload — POST /api/v1/profile/avatar */
-export async function uploadProfileAvatar(file: File): Promise<StorageUploadResponse> {
+/** POST /api/v1/files — загрузка файла в хранилище. */
+export async function uploadFile(file: File): Promise<UploadView> {
   const formData = new FormData()
   formData.append("file", file)
-  return apiFormRequest<StorageUploadResponse>("/api/v1/profile/avatar", formData)
+  const data = await apiFormRequest<{ items: UploadView[] } | UploadView[]>("/api/v1/files", formData)
+  const items = parseUploadList(data)
+  const first = items[0]
+  if (!first?.id) {
+    throw new ApiError("Сервер не вернул идентификатор загруженного файла", 500, "invalid_upload")
+  }
+  return first
 }
 
-/** @deprecated Backend v2 has no DELETE avatar endpoint */
-export async function clearProfileAvatar(): Promise<void> {
-  throw new ApiError("Удаление аватара недоступно в текущей версии API", 501, "not_implemented")
+/** Загрузка файла + привязка как аватар профиля (PATCH /api/v1/profile/avatar). */
+export async function uploadProfileAvatar(file: File): Promise<ProfileResponse> {
+  const uploaded = await uploadFile(file)
+  return apiRequest<ProfileResponse>("/api/v1/profile/avatar", {
+    method: "PATCH",
+    body: JSON.stringify({ upload_id: uploaded.id }),
+  })
+}
+
+export async function clearProfileAvatar(): Promise<ProfileResponse> {
+  return apiRequest<ProfileResponse>("/api/v1/profile/avatar", { method: "DELETE" })
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
@@ -394,22 +408,11 @@ function parseUploadList(data: { items?: UploadView[] } | UploadView[]): UploadV
   return data.items ?? []
 }
 
-/** @deprecated Use uploadProfileAvatar or uploadCoachCourseMaterial */
 export async function uploadFiles(files: File[]): Promise<UploadView[]> {
   if (!files.length) return []
   const results: UploadView[] = []
   for (const file of files) {
-    const uploaded = await uploadProfileAvatar(file)
-    results.push({
-      id: uploaded.path,
-      author_id: "",
-      file_path: uploaded.path,
-      url: uploaded.download_url,
-      original_name: file.name,
-      mime_type: file.type || "application/octet-stream",
-      size_bytes: file.size,
-      created_at: new Date().toISOString(),
-    })
+    results.push(await uploadFile(file))
   }
   return results
 }

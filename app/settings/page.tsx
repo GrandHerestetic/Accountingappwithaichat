@@ -9,6 +9,7 @@ import { PushNotificationSetup } from "@/components/push-notification-setup"
 import { User, Bell, Save, Loader2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { getProfile, updateProfile, uploadProfileAvatar } from "@/lib/api"
+import { resolveUploadUrl } from "@/lib/upload-url"
 import { FileUploadField } from "@/components/file-upload-field"
 import { useAuth } from "@/contexts/auth-context"
 import { FormField, fieldAriaProps, fieldInputClass } from "@/components/form-field"
@@ -29,6 +30,7 @@ export default function SettingsPage() {
   const [errors, setErrors] = useState<FieldErrors<SettingsField>>({})
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarSaving, setAvatarSaving] = useState(false)
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("")
   const [form, setForm] = useState({
     display_name: "",
     phone: "",
@@ -61,7 +63,9 @@ export default function SettingsPage() {
     if (!avatarFile) return
     setAvatarSaving(true)
     try {
-      await uploadProfileAvatar(avatarFile)
+      const updated = await uploadProfileAvatar(avatarFile)
+      const url = resolveUploadUrl(String(updated.avatar_url ?? ""))
+      if (url) setAvatarPreviewUrl(url)
       await refreshUser()
       setAvatarFile(null)
       toast.success("Аватар обновлён")
@@ -126,6 +130,13 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div>
                   <Label>Аватар</Label>
+                  {(avatarPreviewUrl || resolveUploadUrl(user?.profile?.avatar_url)) && (
+                    <img
+                      src={avatarPreviewUrl || resolveUploadUrl(user?.profile?.avatar_url)}
+                      alt=""
+                      className="w-20 h-20 rounded-full object-cover mb-3 border"
+                    />
+                  )}
                   <FileUploadField
                     label="Загрузить фото профиля"
                     hint="JPG, PNG до 5MB"

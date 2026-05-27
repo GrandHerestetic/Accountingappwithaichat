@@ -32,7 +32,9 @@ import {
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import { getExecutorRating, getExecutorReviews, getProfile, updateProfile } from "@/lib/api"
+import { getExecutorRating, getExecutorReviews, getProfile, updateProfile, uploadProfileAvatar } from "@/lib/api"
+import { FileUploadField } from "@/components/file-upload-field"
+import { resolveUploadUrl } from "@/lib/upload-url"
 import type { Review } from "@/lib/api/types"
 import { FormField, fieldAriaProps, fieldInputClass } from "@/components/form-field"
 import {
@@ -85,6 +87,9 @@ export default function ProfilePage() {
   const [newAchievement, setNewAchievement] = useState({ title: "", description: "" })
   const [profileErrors, setProfileErrors] = useState<FieldErrors<ProfileField>>({})
   const [achievementErrors, setAchievementErrors] = useState<FieldErrors<AchievementField>>({})
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarSaving, setAvatarSaving] = useState(false)
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string>("")
 
   const profile = {
     name: editedProfile.name || user?.profile?.profile_name || user?.email || "",
@@ -96,7 +101,10 @@ export default function ProfilePage() {
     memberSince:
       (user?.profile?.platform_joined_at as string | undefined) ?? user?.created_at ?? "",
     verified: user?.verification_status === "verified",
-    avatar: user?.profile?.avatar_url || "/placeholder.svg?height=120&width=120",
+    avatar:
+      avatarPreviewUrl ||
+      resolveUploadUrl(user?.profile?.avatar_url) ||
+      "/placeholder.svg?height=120&width=120",
     bio: editedProfile.bio,
     specializations: [] as string[],
     contact: {
@@ -163,6 +171,23 @@ export default function ProfilePage() {
     setAchievementErrors({})
     setIsAchievementDialogOpen(false)
     toast.success("Достижение добавлено в портфолио")
+  }
+
+  const handleAvatarSave = async () => {
+    if (!avatarFile) return
+    setAvatarSaving(true)
+    try {
+      const updated = await uploadProfileAvatar(avatarFile)
+      const url = resolveUploadUrl(String(updated.avatar_url ?? ""))
+      if (url) setAvatarPreviewUrl(url)
+      await refreshUser()
+      setAvatarFile(null)
+      toast.success("Аватар обновлён")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Не удалось загрузить аватар")
+    } finally {
+      setAvatarSaving(false)
+    }
   }
 
   const handleSaveProfile = async () => {
@@ -269,6 +294,26 @@ export default function ProfilePage() {
                           </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-6">
+                          <div className="space-y-3">
+                            <h4 className="font-medium text-lg">Фото профиля</h4>
+                            <FileUploadField
+                              label="Загрузить аватар"
+                              hint="JPG, PNG, WEBP до 5 МБ"
+                              value={avatarFile}
+                              onChange={setAvatarFile}
+                              accept="image/jpeg,image/png,image/webp"
+                              disabled={avatarSaving}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={!avatarFile || avatarSaving}
+                              onClick={handleAvatarSave}
+                            >
+                              {avatarSaving ? "Загрузка..." : "Сохранить аватар"}
+                            </Button>
+                          </div>
                           {/* Основная информация */}
                           <div className="space-y-4">
                             <h4 className="font-medium text-lg">Основная информация</h4>

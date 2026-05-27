@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar, MapPin, DollarSign, TrendingUp, Pin, Palette } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
-import { createOrder, submitMyOrder } from "@/lib/api"
+import { createOrder, submitMyOrder, uploadAndAttach } from "@/lib/api"
+import { MultiFileUploadField } from "@/components/multi-file-upload-field"
 import type { CreateOrderRequest, Order } from "@/lib/api/types"
 import { ORDER_CATEGORIES } from "@/lib/order-categories"
 import { FormField, fieldAriaProps, fieldInputClass } from "@/components/form-field"
@@ -38,6 +39,7 @@ export default function CreateOrder() {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [attachments, setAttachments] = useState<File[]>([])
 
   const categories = ORDER_CATEGORIES.map((c) => ({ label: c.label, slug: c.slug }))
 
@@ -123,6 +125,10 @@ export default function CreateOrder() {
     setIsSubmitting(true)
     try {
       const order = await createOrder(payload)
+
+      if (attachments.length > 0) {
+        await uploadAndAttach(attachments, "order_attachment", order.id)
+      }
 
       await submitMyOrder(order.id)
 
@@ -284,6 +290,24 @@ export default function CreateOrder() {
                         </Select>
                       </div>
                     </FormField>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Файлы к заказу</CardTitle>
+                    <CardDescription>
+                      Необязательно: ТЗ, шаблоны, сканы — исполнители увидят их после выбора
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <MultiFileUploadField
+                      label="Прикрепить файлы"
+                      hint="PDF, DOC, DOCX, JPG, PNG (до 50 МБ каждый)"
+                      files={attachments}
+                      onChange={setAttachments}
+                      disabled={isSubmitting}
+                    />
                   </CardContent>
                 </Card>
 

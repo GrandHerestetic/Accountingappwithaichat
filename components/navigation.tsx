@@ -36,6 +36,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
+import { resolveUploadUrl } from "@/lib/upload-url"
 
 export function Navigation() {
   const pathname = usePathname()
@@ -295,7 +296,11 @@ export function Navigation() {
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="flex items-center space-x-1 md:space-x-2 px-1 md:px-2">
                         <Avatar className="h-6 w-6 md:h-7 md:w-7">
-                          <AvatarImage src={user?.profile?.avatar_url || "/placeholder.svg"} />
+                          <AvatarImage
+                            src={
+                              resolveUploadUrl(user?.profile?.avatar_url) || "/placeholder.svg"
+                            }
+                          />
                           <AvatarFallback className="text-xs">
                             {(user?.profile?.profile_name ?? user?.email ?? "U")
                               .split(" ")
