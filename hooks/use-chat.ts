@@ -60,16 +60,17 @@ export function useChat({ chatId, userId }: UseChatOptions) {
     }
   }, [chatId, userId])
 
-  const sendMessage = async (content: string) => {
+  const sendMessage = async (content: string, attachmentIds?: string[]) => {
     if (!chatId || !UUID_RE.test(chatId)) {
       throw new Error("Чат недоступен")
     }
     const text = content.trim()
-    if (!text) {
-      throw new Error("Введите текст сообщения")
+    const ids = attachmentIds?.filter(Boolean) ?? []
+    if (!text && ids.length === 0) {
+      throw new Error("Введите текст или прикрепите файл")
     }
-    if (text.length > 2000) {
-      throw new Error("Сообщение не более 2000 символов")
+    if (text.length > 5000) {
+      throw new Error("Сообщение не более 5000 символов")
     }
 
     const tempId = `temp-${Date.now()}`
@@ -78,13 +79,18 @@ export function useChat({ chatId, userId }: UseChatOptions) {
       chat_id: chatId,
       sender_id: userId,
       content: text,
+      attachments: [],
       created_at: new Date().toISOString(),
       is_read: false,
     }
     setMessages((prev) => [...prev, tempMsg])
 
     try {
-      const msg = await sendChatMessage(chatId, text, userId)
+      const msg = await sendChatMessage(
+        chatId,
+        { text: text || undefined, attachment_ids: ids.length ? ids : undefined },
+        userId
+      )
       setMessages((prev) => [...prev.filter((m) => m.id !== tempId), msg])
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m.id !== tempId))

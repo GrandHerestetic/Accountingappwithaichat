@@ -441,7 +441,8 @@ export async function deleteFile(id: string): Promise<void> {
 export async function attachFiles(
   targetType: AttachmentTargetType,
   targetId: string,
-  uploadIds: string[]
+  uploadIds: string[],
+  metadata?: Record<string, unknown>
 ): Promise<AttachmentView[]> {
   if (!uploadIds.length) return []
   const data = await apiRequest<{ items: AttachmentView[] }>("/api/v1/attachments", {
@@ -450,6 +451,7 @@ export async function attachFiles(
       target_type: targetType,
       target_id: targetId,
       upload_ids: uploadIds,
+      ...(metadata && Object.keys(metadata).length > 0 ? { metadata } : {}),
     }),
   })
   return data.items ?? []
@@ -479,17 +481,33 @@ export async function reorderAttachments(ids: string[]): Promise<void> {
 export async function uploadAndAttach(
   files: File[],
   targetType: AttachmentTargetType,
-  targetId: string
+  targetId: string,
+  metadata?: Record<string, unknown>
 ): Promise<UploadView[]> {
   const uploads = await uploadFiles(files)
   if (uploads.length) {
     await attachFiles(
       targetType,
       targetId,
-      uploads.map((u) => u.id)
+      uploads.map((u) => u.id),
+      metadata
     )
   }
   return uploads
+}
+
+/** Загрузить файл и привязать к профилю с метаданными (портфолио / достижение). */
+export async function attachProfileDocument(
+  userId: string,
+  file: File,
+  metadata: Record<string, unknown>
+): Promise<AttachmentView[]> {
+  const uploads = await uploadFiles([file])
+  const uploadId = uploads[0]?.id
+  if (!uploadId) {
+    throw new Error("Не удалось загрузить файл")
+  }
+  return attachFiles("profile_document", userId, [uploadId], metadata)
 }
 
 /** Public multipart registration for executors (diploma backend). */
@@ -535,16 +553,22 @@ export async function sendChatMessage(
   body: import("./types").SendMessageRequest | string,
   currentUserId?: string
 ): Promise<import("./types").ChatMessage> {
-  const text =
+  const payload =
     typeof body === "string"
-      ? body.trim()
-      : (body.text ?? "").trim()
-  if (!text) {
-    throw new ApiError("Текст сообщения обязателен", 400, "bad_request")
+      ? { text: body.trim(), attachment_ids: undefined as string[] | undefined }
+      : {
+          text: (body.text ?? "").trim(),
+          attachment_ids: body.attachment_ids?.filter(Boolean),
+        }
+  if (!payload.text && !payload.attachment_ids?.length) {
+    throw new ApiError("Введите текст или прикрепите файл", 400, "bad_request")
   }
   const msg = await apiRequest<import("./types").Message>(`/api/v1/my/chats/${chatId}/messages`, {
     method: "POST",
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({
+      text: payload.text,
+      ...(payload.attachment_ids?.length ? { attachment_ids: payload.attachment_ids } : {}),
+    }),
   })
   return normalizeMessage(msg, currentUserId)
 }

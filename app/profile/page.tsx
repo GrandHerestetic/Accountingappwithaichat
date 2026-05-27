@@ -19,7 +19,6 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   Star,
   MapPin,
-  Award,
   CheckCircle,
   MessageCircle,
   Phone,
@@ -28,44 +27,33 @@ import {
   Edit,
   Save,
   X,
-  Plus,
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { getExecutorRating, getExecutorReviews, getProfile, updateProfile, uploadProfileAvatar } from "@/lib/api"
 import { FileUploadField } from "@/components/file-upload-field"
+import { ProfileAchievementsTab } from "@/components/profile/profile-achievements-tab"
+import { ProfilePortfolioTab } from "@/components/profile/profile-portfolio-tab"
 import { resolveUploadUrl } from "@/lib/upload-url"
-import type { Review } from "@/lib/api/types"
+import {
+  filterProfileDocuments,
+  parseProfileDocuments,
+  PROFILE_DOC_KIND_ACHIEVEMENT,
+  PROFILE_DOC_KIND_PORTFOLIO,
+  type ProfileDocItem,
+} from "@/lib/profile-documents"
+import type { ProfilePlatformAchievement, Review } from "@/lib/api/types"
 import { FormField, fieldAriaProps, fieldInputClass } from "@/components/form-field"
 import {
   clearFieldError,
   type FieldErrors,
   validateMinLength,
   validatePhone,
-  validateRequired,
   validateUrl,
 } from "@/lib/form-errors"
 import { toast } from "sonner"
 
 type ProfileField = "name" | "phone" | "website"
-type AchievementField = "title"
-
-type PortfolioAchievement = {
-  id: string
-  title: string
-  description: string
-  createdAt: string
-}
-
-function loadPortfolioAchievements(userId: string): PortfolioAchievement[] {
-  if (typeof window === "undefined") return []
-  try {
-    const raw = localStorage.getItem(`portfolio_achievements_${userId}`)
-    return raw ? (JSON.parse(raw) as PortfolioAchievement[]) : []
-  } catch {
-    return []
-  }
-}
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth()
@@ -84,11 +72,9 @@ export default function ProfilePage() {
   })
   const [specializations, setSpecializations] = useState<string[]>([])
   const [specializationsText, setSpecializationsText] = useState("")
-  const [portfolioAchievements, setPortfolioAchievements] = useState<PortfolioAchievement[]>([])
-  const [isAchievementDialogOpen, setIsAchievementDialogOpen] = useState(false)
-  const [newAchievement, setNewAchievement] = useState({ title: "", description: "" })
+  const [profileDocuments, setProfileDocuments] = useState<ProfileDocItem[]>([])
+  const [platformAchievements, setPlatformAchievements] = useState<ProfilePlatformAchievement[]>([])
   const [profileErrors, setProfileErrors] = useState<FieldErrors<ProfileField>>({})
-  const [achievementErrors, setAchievementErrors] = useState<FieldErrors<AchievementField>>({})
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarSaving, setAvatarSaving] = useState(false)
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string>("")
@@ -133,11 +119,43 @@ export default function ProfilePage() {
     },
   }
 
+  const reloadProfileDocuments = async () => {
+    const p = await getProfile()
+    setProfileDocuments(parseProfileDocuments(p.documents))
+    const achievements = p.achievements
+    if (Array.isArray(achievements)) {
+      setPlatformAchievements(
+        achievements.map((a) => {
+          const row = a as Record<string, unknown>
+          return {
+            code: String(row.code ?? ""),
+            title: String(row.title ?? ""),
+            description: String(row.description ?? ""),
+          }
+        })
+      )
+    }
+  }
+
   useEffect(() => {
     const load = async () => {
       try {
         const p = await getProfile()
         applyProfileFromApi(p as Record<string, unknown>)
+        setProfileDocuments(parseProfileDocuments(p.documents))
+        const achievements = p.achievements
+        if (Array.isArray(achievements)) {
+          setPlatformAchievements(
+            achievements.map((a) => {
+              const row = a as Record<string, unknown>
+              return {
+                code: String(row.code ?? ""),
+                title: String(row.title ?? ""),
+                description: String(row.description ?? ""),
+              }
+            })
+          )
+        }
         if (user?.id && user.role === "executor") {
           const [r, rev] = await Promise.all([
             getExecutorRating(user.id),
@@ -154,35 +172,6 @@ export default function ProfilePage() {
     }
     if (user) load()
   }, [user])
-
-  useEffect(() => {
-    if (user?.id) {
-      setPortfolioAchievements(loadPortfolioAchievements(user.id))
-    }
-  }, [user?.id])
-
-  const handleAddAchievement = () => {
-    if (!user?.id) return
-    const title = newAchievement.title.trim()
-    const description = newAchievement.description.trim()
-    const titleError = validateRequired(title, "Укажите название достижения")
-    setAchievementErrors({ title: titleError })
-    if (titleError) return
-
-    const item: PortfolioAchievement = {
-      id: crypto.randomUUID(),
-      title,
-      description,
-      createdAt: new Date().toISOString(),
-    }
-    const updated = [item, ...portfolioAchievements]
-    setPortfolioAchievements(updated)
-    localStorage.setItem(`portfolio_achievements_${user.id}`, JSON.stringify(updated))
-    setNewAchievement({ title: "", description: "" })
-    setAchievementErrors({})
-    setIsAchievementDialogOpen(false)
-    toast.success("Достижение добавлено в портфолио")
-  }
 
   const handleAvatarSave = async () => {
     if (!avatarFile) return
@@ -580,159 +569,24 @@ export default function ProfilePage() {
                 </TabsContent>
 
                 <TabsContent value="portfolio" className="space-y-6">
-                  <Card>
-                    <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-                      <div>
-                        <CardTitle>Портфолио</CardTitle>
-                        <CardDescription>Примеры работ и достижения</CardDescription>
-                      </div>
-                      <Dialog open={isAchievementDialogOpen} onOpenChange={setIsAchievementDialogOpen}>
-                        <Button size="sm" onClick={() => setIsAchievementDialogOpen(true)}>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Добавить достижение
-                        </Button>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Новое достижение</DialogTitle>
-                            <DialogDescription>
-                              Добавьте награду или успех, который будет виден в портфолио
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <FormField
-                              label="Название"
-                              htmlFor="achievement-title"
-                              error={achievementErrors.title}
-                              required
-                            >
-                              <Input
-                                id="achievement-title"
-                                value={newAchievement.title}
-                                onChange={(e) => {
-                                  setNewAchievement((prev) => ({ ...prev, title: e.target.value }))
-                                  setAchievementErrors((prev) => clearFieldError(prev, "title"))
-                                }}
-                                placeholder="Например: Сертификат 1С"
-                                className={fieldInputClass(achievementErrors.title)}
-                                {...fieldAriaProps(achievementErrors.title, "achievement-title")}
-                              />
-                            </FormField>
-                            <FormField label="Описание" htmlFor="achievement-description">
-                              <Textarea
-                                id="achievement-description"
-                                rows={3}
-                                value={newAchievement.description}
-                                onChange={(e) =>
-                                  setNewAchievement((prev) => ({
-                                    ...prev,
-                                    description: e.target.value,
-                                  }))
-                                }
-                                placeholder="Кратко опишите достижение..."
-                              />
-                            </FormField>
-                            <div className="flex gap-3 pt-2">
-                              <Button onClick={handleAddAchievement} className="flex-1">
-                                <Save className="w-4 h-4 mr-2" />
-                                Сохранить
-                              </Button>
-                              <Button
-                                variant="outline"
-                                onClick={() => setIsAchievementDialogOpen(false)}
-                              >
-                                Отмена
-                              </Button>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </CardHeader>
-                    <CardContent>
-                      {portfolioAchievements.length === 0 ? (
-                        <div className="text-center py-12">
-                          <Award className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                          <h3 className="text-lg font-medium mb-2">Портфолио пока пусто</h3>
-                          <p className="text-gray-600 mb-6">
-                            Добавьте достижения, чтобы показать клиентам свой опыт
-                          </p>
-                          <Button onClick={() => setIsAchievementDialogOpen(true)}>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Добавить достижение
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="grid gap-4 md:grid-cols-2">
-                          {portfolioAchievements.map((item) => (
-                            <div
-                              key={item.id}
-                              className="flex items-start gap-4 p-4 border rounded-lg bg-white"
-                            >
-                              <div className="p-3 bg-amber-100 rounded-full shrink-0">
-                                <Award className="w-6 h-6 text-amber-600" />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                  <h4 className="font-medium">{item.title}</h4>
-                                  <Badge variant="secondary" className="text-xs">
-                                    Достижение
-                                  </Badge>
-                                </div>
-                                {item.description ? (
-                                  <p className="text-sm text-gray-600">{item.description}</p>
-                                ) : null}
-                                <p className="text-xs text-gray-400 mt-2">
-                                  {new Date(item.createdAt).toLocaleDateString("ru-RU")}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                  {user?.id ? (
+                    <ProfilePortfolioTab
+                      userId={user.id}
+                      items={filterProfileDocuments(profileDocuments, PROFILE_DOC_KIND_PORTFOLIO)}
+                      onChanged={reloadProfileDocuments}
+                    />
+                  ) : null}
                 </TabsContent>
 
                 <TabsContent value="achievements" className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Достижения</CardTitle>
-                      <CardDescription>Ваши награды и достижения</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {portfolioAchievements.length === 0 ? (
-                        <div className="text-center py-12">
-                          <Award className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                          <h3 className="text-lg font-medium mb-2">Достижений пока нет</h3>
-                          <p className="text-gray-600 mb-6">
-                            Добавьте достижения во вкладке «Портфолио»
-                          </p>
-                          <Button onClick={() => setIsAchievementDialogOpen(true)}>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Добавить достижение
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="grid gap-4 md:grid-cols-2">
-                          {portfolioAchievements.map((item) => (
-                            <div
-                              key={item.id}
-                              className="flex items-center gap-4 p-4 border rounded-lg"
-                            >
-                              <div className="p-3 bg-blue-100 rounded-full shrink-0">
-                                <Award className="w-6 h-6 text-blue-600" />
-                              </div>
-                              <div>
-                                <h4 className="font-medium">{item.title}</h4>
-                                {item.description ? (
-                                  <p className="text-sm text-gray-600">{item.description}</p>
-                                ) : null}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                  {user?.id ? (
+                    <ProfileAchievementsTab
+                      userId={user.id}
+                      items={filterProfileDocuments(profileDocuments, PROFILE_DOC_KIND_ACHIEVEMENT)}
+                      platformAchievements={platformAchievements}
+                      onChanged={reloadProfileDocuments}
+                    />
+                  ) : null}
                 </TabsContent>
               </Tabs>
             </div>

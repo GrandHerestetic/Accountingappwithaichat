@@ -1,12 +1,27 @@
+import { resolveUploadUrl } from "@/lib/upload-url"
 import type {
   Chat,
   ChatDetail,
   ChatMessage,
+  ChatMessageAttachment,
   ChatParticipant,
   MeResponse,
   Message,
+  MessageAttachment,
   UserProfile,
 } from "./types"
+
+function normalizeMessageAttachments(raw?: MessageAttachment[]): ChatMessageAttachment[] {
+  if (!Array.isArray(raw)) return []
+  return raw.map((a) => ({
+    id: a.id,
+    upload_id: a.upload_id,
+    url: resolveUploadUrl(a.url ?? a.file_path),
+    original_name: a.original_name ?? "file",
+    mime_type: a.mime_type ?? "application/octet-stream",
+    size_bytes: a.size_bytes ?? 0,
+  }))
+}
 
 /** Supports nested `{ user, profile }` and flat `/auth/me` payloads. */
 export function normalizeMeResponse(data: MeResponse | Record<string, unknown>): UserProfile {
@@ -47,12 +62,14 @@ export function normalizeMeResponse(data: MeResponse | Record<string, unknown>):
 
 export function normalizeMessage(msg: Message, currentUserId?: string): ChatMessage {
   const deleted = Boolean(msg.deleted_at)
-  const body = msg.body ?? (msg as Message & { text?: string }).text ?? ""
+  const body = msg.body ?? msg.text ?? ""
+  const attachments = normalizeMessageAttachments(msg.attachments)
   return {
     id: msg.id,
     chat_id: msg.chat_id,
     sender_id: msg.sender_user_id ?? "",
     content: deleted ? "Сообщение удалено" : body,
+    attachments: deleted ? [] : attachments,
     created_at: msg.created_at,
     is_read: currentUserId ? msg.sender_user_id === currentUserId : false,
     deleted_at: msg.deleted_at ?? null,

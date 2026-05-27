@@ -203,6 +203,18 @@ export interface ChatDetail extends Chat {
 }
 
 /** Backend message shape */
+export interface MessageAttachment {
+  id: string
+  upload_id: string
+  file_path?: string
+  url?: string
+  original_name: string
+  mime_type: string
+  size_bytes: number
+  created_at?: string
+}
+
+/** Backend message shape */
 export interface Message {
   id: string
   chat_id: string
@@ -210,6 +222,7 @@ export interface Message {
   sender_user_id?: string
   body?: string
   text?: string
+  attachments?: MessageAttachment[]
   created_at: string
   edited_at?: string
   deleted_at?: string
@@ -221,10 +234,20 @@ export interface ChatMessage {
   chat_id: string
   sender_id: string
   content: string
+  attachments: ChatMessageAttachment[]
   created_at: string
   is_read: boolean
   deleted_at?: string | null
   edited_at?: string | null
+}
+
+export interface ChatMessageAttachment {
+  id: string
+  upload_id: string
+  url: string
+  original_name: string
+  mime_type: string
+  size_bytes: number
 }
 
 export interface SendMessageRequest {
@@ -487,8 +510,19 @@ export interface AttachmentView {
   target_type: AttachmentTargetType
   target_id: string
   upload_id: string
+  sort_order?: number
+  metadata?: Record<string, unknown>
   url?: string
   original_name?: string
+  mime_type?: string
+  size_bytes?: number
+  created_at?: string
+}
+
+export interface ProfilePlatformAchievement {
+  code: string
+  title: string
+  description: string
 }
 
 export interface ExecutorLeadSubmittedResponse {

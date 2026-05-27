@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { Navigation } from "@/components/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +8,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { Send, Search, MoreVertical, Phone, Video, Paperclip, Smile, Circle, Loader2, AlertCircle } from "lucide-react"
+import { Search, Loader2, AlertCircle } from "lucide-react"
+import { ChatComposer } from "@/components/chat/chat-composer"
+import { ChatMessageAttachments } from "@/components/chat/chat-message-attachments"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { listMyChats, markChatRead } from "@/lib/api"
@@ -33,7 +33,6 @@ interface ChatListItem extends Chat {
 // ---------------------------------------------------------------------------
 function ChatWindow({ chat, userId }: { chat: ChatListItem; userId: string }) {
   const [messageInput, setMessageInput] = useState("")
-  const [sendError, setSendError] = useState<string | null>(null)
   const { messages, sendMessage, handleTyping, isConnected, error } = useChat({
     chatId: chat.id,
     userId,
@@ -44,61 +43,27 @@ function ChatWindow({ chat, userId }: { chat: ChatListItem; userId: string }) {
     if (chat.id) markChatRead(chat.id).catch(() => {})
   }, [chat.id])
 
-  const handleSend = async () => {
-    const content = messageInput.trim()
-    if (!content) return
-    setSendError(null)
-    try {
-      await sendMessage(content)
-      setMessageInput("")
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Не удалось отправить сообщение"
-      setSendError(msg)
-      // Keep message in input so user can retry
-    }
-  }
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }
-
   const otherName = chat.other_participant_name ?? `Чат #${chat.order_id}`
 
   return (
     <Card className="lg:col-span-3 flex flex-col h-[calc(100vh-140px)]">
       {/* Chat Header */}
       <CardHeader className="pb-3 border-b">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-10 w-10">
-              <AvatarFallback>
-                {otherName
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .slice(0, 2)}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h3 className="font-medium">{otherName}</h3>
-              <p className="text-sm text-gray-500">
-                {isConnected ? "В сети" : error ? "Режим опроса" : "Подключение..."}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm">
-              <Phone className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm">
-              <Video className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
+        <div className="flex items-center space-x-3">
+          <Avatar className="h-10 w-10">
+            <AvatarFallback>
+              {otherName
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .slice(0, 2)}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <h3 className="font-medium">{otherName}</h3>
+            <p className="text-sm text-gray-500">
+              {isConnected ? "В сети" : error ? "Режим опроса" : "Подключение..."}
+            </p>
           </div>
         </div>
         <Badge variant="secondary" className="w-fit">
@@ -143,7 +108,10 @@ function ChatWindow({ chat, userId }: { chat: ChatListItem; userId: string }) {
                           : "bg-gray-100 text-gray-900 rounded-bl-md"
                       }`}
                     >
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      {msg.content ? (
+                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      ) : null}
+                      <ChatMessageAttachments attachments={msg.attachments} isMe={isMe} />
                       <p
                         className={`text-xs mt-1 ${isMe ? "text-blue-100" : "text-gray-500"}`}
                       >
@@ -161,45 +129,13 @@ function ChatWindow({ chat, userId }: { chat: ChatListItem; userId: string }) {
         </ScrollArea>
       </CardContent>
 
-      {/* Message Input */}
       <div className="p-4 border-t">
-        {sendError && (
-          <p className="text-xs text-red-600 mb-2 flex items-center gap-1">
-            <AlertCircle className="w-3 h-3" />
-            {sendError}
-          </p>
-        )}
-        <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="sm">
-            <Paperclip className="h-4 w-4" />
-          </Button>
-          <div className="flex-1 relative">
-            <Input
-              placeholder="Введите сообщение..."
-              value={messageInput}
-              onChange={(e) => {
-                setMessageInput(e.target.value)
-                handleTyping()
-              }}
-              onKeyPress={handleKeyPress}
-              className="pr-10"
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute right-1 top-1/2 transform -translate-y-1/2"
-            >
-              <Smile className="h-4 w-4" />
-            </Button>
-          </div>
-          <Button
-            onClick={handleSend}
-            disabled={!messageInput.trim()}
-            className="bg-blue-500 hover:bg-blue-600"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
+        <ChatComposer
+          value={messageInput}
+          onChange={setMessageInput}
+          onSend={sendMessage}
+          onTyping={handleTyping}
+        />
       </div>
     </Card>
   )
