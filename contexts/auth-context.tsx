@@ -1,10 +1,14 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
 import { refreshAccessToken } from "@/lib/api-client"
 import { clearPersistedTokens, extractTokenPair, persistTokens } from "@/lib/auth-tokens"
 import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister } from "@/lib/api"
 import type { LoginRequest, RegisterRequest, UserProfile } from "@/lib/api/types"
+import { ApiError } from "@/lib/api/types"
+
+/** Access JWT ~15 min — обновляем чуть раньше истечения */
+const PROACTIVE_REFRESH_MS = 12 * 60 * 1000
 
 interface AuthContextType {
   user: UserProfile | null
@@ -23,11 +27,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     const profile = await getMe()
     setUser(profile)
     setIsAuthenticated(true)
-  }
+  }, [])
+
+  const silentRefresh = useCallback(async () => {
+    if (typeof window === "undefined") return
+    if (!localStorage.getItem("refresh_token")) return
+
+    const result = await refreshAccessToken()
+    if (result.ok) {
+      try {
+        await refreshUser()
+      } catch {
+        // access валиден — не сбрасываем сессию из-за временной ошибки /me
+      }
+    } else if (result.reason === "auth" || result.reason === "no_refresh_token") {
+      clearPersistedTokens()
+      setUser(null)
+      setIsAuthenticated(false)
+    }
+  }, [refreshUser])
+
+  useEffect(() => {
+    const onSessionExpired = () => {
+      setUser(null)
+      setIsAuthenticated(false)
+    }
+    window.addEventListener("auth:session-expired", onSessionExpired)
+    return () => window.removeEventListener("auth:session-expired", onSessionExpired)
+  }, [])
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -37,25 +68,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!storedRefreshToken) return
 
-        const access = await refreshAccessToken()
-        if (!access) {
-          clearPersistedTokens()
+        const result = await refreshAccessToken()
+        if (!result.ok) {
+          if (result.reason === "auth" || result.reason === "no_refresh_token") {
+            clearPersistedTokens()
+          }
           return
         }
 
-        await refreshUser()
+        try {
+          await refreshUser()
+        } catch (error) {
+          if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+            clearPersistedTokens()
+            setIsAuthenticated(false)
+            setUser(null)
+          }
+          // сеть / 5xx — токены оставляем, пользователь остаётся «полуавторизован» до следующего запроса
+        }
       } catch (error) {
         console.error("Error restoring auth session:", error)
-        clearPersistedTokens()
-        setIsAuthenticated(false)
-        setUser(null)
       } finally {
         setIsLoading(false)
       }
     }
 
     restoreSession()
-  }, [])
+  }, [refreshUser])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void silentRefresh()
+    }, PROACTIVE_REFRESH_MS)
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void silentRefresh()
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener("visibilitychange", onVisible)
+    }
+  }, [silentRefresh])
 
   const login = async (credentials: LoginRequest): Promise<void> => {
     const auth = await apiLogin(credentials)

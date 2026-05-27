@@ -82,6 +82,8 @@ export default function ProfilePage() {
     phone: "",
     website: "",
   })
+  const [specializations, setSpecializations] = useState<string[]>([])
+  const [specializationsText, setSpecializationsText] = useState("")
   const [portfolioAchievements, setPortfolioAchievements] = useState<PortfolioAchievement[]>([])
   const [isAchievementDialogOpen, setIsAchievementDialogOpen] = useState(false)
   const [newAchievement, setNewAchievement] = useState({ title: "", description: "" })
@@ -90,6 +92,23 @@ export default function ProfilePage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarSaving, setAvatarSaving] = useState(false)
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string>("")
+
+  const applyProfileFromApi = (p: Record<string, unknown>) => {
+    setEditedProfile({
+      name: String(p.profile_name ?? p.display_name ?? p.contact_name ?? p.company_name ?? ""),
+      title: String(p.experience_level ?? p.expertise ?? ""),
+      location: String(p.city ?? p.address ?? ""),
+      bio: String(p.about ?? p.bio ?? ""),
+      email: user?.email ?? "",
+      phone: String(p.phone ?? ""),
+      website: String(p.website ?? ""),
+    })
+    const specs = Array.isArray(p.specializations)
+      ? (p.specializations as unknown[]).map(String).filter(Boolean)
+      : []
+    setSpecializations(specs)
+    setSpecializationsText(specs.join(", "))
+  }
 
   const profile = {
     name: editedProfile.name || user?.profile?.profile_name || user?.email || "",
@@ -106,7 +125,7 @@ export default function ProfilePage() {
       resolveUploadUrl(user?.profile?.avatar_url) ||
       "/placeholder.svg?height=120&width=120",
     bio: editedProfile.bio,
-    specializations: [] as string[],
+    specializations,
     contact: {
       email: editedProfile.email || user?.email || "",
       phone: editedProfile.phone,
@@ -118,15 +137,7 @@ export default function ProfilePage() {
     const load = async () => {
       try {
         const p = await getProfile()
-        setEditedProfile({
-          name: String(p.display_name ?? p.profile_name ?? user?.profile?.profile_name ?? ""),
-          title: String(p.title ?? "Бухгалтер"),
-          location: String(p.city ?? p.location ?? ""),
-          bio: String(p.about ?? p.bio ?? ""),
-          email: user?.email ?? "",
-          phone: String(p.phone ?? ""),
-          website: String(p.website ?? ""),
-        })
+        applyProfileFromApi(p as Record<string, unknown>)
         if (user?.id && user.role === "executor") {
           const [r, rev] = await Promise.all([
             getExecutorRating(user.id),
@@ -200,12 +211,26 @@ export default function ProfilePage() {
     if (Object.values(nextErrors).some(Boolean)) return
 
     try {
-      await updateProfile({
-        display_name: editedProfile.name,
-        about: editedProfile.bio,
-        phone: editedProfile.phone,
-        bio: editedProfile.bio,
-      })
+      const updated = await updateProfile(
+        {
+          profile_name: editedProfile.name.trim(),
+          phone: editedProfile.phone.trim(),
+          about: editedProfile.bio.trim(),
+          bio: editedProfile.bio.trim(),
+          location: editedProfile.location.trim(),
+          website: editedProfile.website.trim(),
+          experience_level: editedProfile.title.trim() || undefined,
+          specializations_text: specializationsText,
+          ...(user?.role === "client"
+            ? {
+                company_name: editedProfile.name.trim(),
+                contact_name: editedProfile.name.trim(),
+              }
+            : {}),
+        },
+        user?.role
+      )
+      applyProfileFromApi(updated as Record<string, unknown>)
       await refreshUser()
       toast.success("Профиль обновлён")
       setProfileErrors({})
@@ -332,9 +357,23 @@ export default function ProfilePage() {
                                   id="edit-title"
                                   value={editedProfile.title}
                                   onChange={(e) => handleInputChange("title", e.target.value)}
+                                  placeholder="Например: Налоговый учёт"
                                 />
                               </FormField>
                             </div>
+                            {user?.role === "executor" && (
+                              <FormField
+                                label="Специализации (через запятую)"
+                                htmlFor="edit-specializations"
+                              >
+                                <Input
+                                  id="edit-specializations"
+                                  value={specializationsText}
+                                  onChange={(e) => setSpecializationsText(e.target.value)}
+                                  placeholder="Налоги, 1С, Отчётность"
+                                />
+                              </FormField>
+                            )}
                             <FormField label="Местоположение" htmlFor="edit-location">
                               <Input
                                 id="edit-location"

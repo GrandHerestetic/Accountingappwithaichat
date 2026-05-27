@@ -11,13 +11,41 @@ const API_BASE_URL =
     ? ""
     : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080")
 
+const ACCESS_TOKEN_SESSION_KEY = "access_token"
+const REFRESH_MAX_ATTEMPTS = 3
+const REFRESH_RETRY_DELAYS_MS = [0, 1000, 2000]
+
+export type RefreshResult =
+  | { ok: true; accessToken: string }
+  | { ok: false; reason: "no_refresh_token" | "auth" | "network" | "invalid_response" }
+
 // ---------------------------------------------------------------------------
-// Module-level access token (in-memory only — never persisted to localStorage)
+// Access token: in-memory + sessionStorage (per-tab, survives HMR/reload)
 // ---------------------------------------------------------------------------
-let accessToken: string | null = null
+function readStoredAccessToken(): string | null {
+  if (typeof window === "undefined") return null
+  try {
+    const t = sessionStorage.getItem(ACCESS_TOKEN_SESSION_KEY)
+    return t && t !== "undefined" ? t : null
+  } catch {
+    return null
+  }
+}
+
+let accessToken: string | null = readStoredAccessToken()
 
 export function setAccessToken(token: string | null): void {
   accessToken = token
+  if (typeof window === "undefined") return
+  try {
+    if (token) {
+      sessionStorage.setItem(ACCESS_TOKEN_SESSION_KEY, token)
+    } else {
+      sessionStorage.removeItem(ACCESS_TOKEN_SESSION_KEY)
+    }
+  } catch {
+    // private browsing / quota
+  }
 }
 
 export function getAccessToken(): string | null {
@@ -25,18 +53,44 @@ export function getAccessToken(): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// Token refresh with deduplication
-// Concurrent callers all await the same in-flight promise so we never send
-// more than one refresh request at a time.
+// Session expiry — AuthProvider listens and clears UI state
 // ---------------------------------------------------------------------------
-let refreshPromise: Promise<string | null> | null = null
+export function notifySessionExpired(): void {
+  if (typeof window === "undefined") return
+  localStorage.removeItem("refresh_token")
+  setAccessToken(null)
+  window.dispatchEvent(new CustomEvent("auth:session-expired"))
+  if (!window.location.pathname.startsWith("/auth/")) {
+    window.location.href = "/auth/login"
+  }
+}
 
-export async function refreshAccessToken(): Promise<string | null> {
+function handleRefreshFailure(result: RefreshResult): void {
+  if (result.ok) return
+  if (result.reason === "auth" || result.reason === "no_refresh_token") {
+    notifySessionExpired()
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Token refresh with deduplication + retries on transient errors
+// ---------------------------------------------------------------------------
+let refreshPromise: Promise<RefreshResult> | null = null
+
+async function postRefresh(refreshToken: string): Promise<Response> {
+  return fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  })
+}
+
+export async function refreshAccessToken(): Promise<RefreshResult> {
   if (refreshPromise) {
     return refreshPromise
   }
 
-  refreshPromise = (async (): Promise<string | null> => {
+  refreshPromise = (async (): Promise<RefreshResult> => {
     try {
       const refreshToken =
         typeof window !== "undefined"
@@ -44,37 +98,67 @@ export async function refreshAccessToken(): Promise<string | null> {
           : null
 
       if (!refreshToken) {
-        return null
+        return { ok: false, reason: "no_refresh_token" }
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      })
+      let lastStatus: number | null = null
 
-      if (!response.ok) {
-        return null
+      for (let attempt = 0; attempt < REFRESH_MAX_ATTEMPTS; attempt++) {
+        const delay = REFRESH_RETRY_DELAYS_MS[attempt] ?? 2000
+        if (delay > 0) {
+          await new Promise<void>((resolve) => setTimeout(resolve, delay))
+        }
+
+        try {
+          const response = await postRefresh(refreshToken)
+          lastStatus = response.status
+
+          if (response.ok) {
+            const data = await response.json()
+            const tokens = extractTokenPair(data)
+            if (!tokens) {
+              return { ok: false, reason: "invalid_response" }
+            }
+            setAccessToken(tokens.access_token)
+            if (typeof window !== "undefined") {
+              localStorage.setItem("refresh_token", tokens.refresh_token)
+            }
+            return { ok: true, accessToken: tokens.access_token }
+          }
+
+          if (response.status === 401 || response.status === 403) {
+            return { ok: false, reason: "auth" }
+          }
+
+          // 5xx / 429 — retry
+          if (response.status >= 500 || response.status === 429) {
+            continue
+          }
+
+          return { ok: false, reason: "auth" }
+        } catch {
+          // network error — retry
+        }
       }
 
-      const data = await response.json()
-      const tokens = extractTokenPair(data)
-      if (!tokens) {
-        return null
+      if (lastStatus !== null && lastStatus >= 500) {
+        return { ok: false, reason: "network" }
       }
-      setAccessToken(tokens.access_token)
-      if (typeof window !== "undefined") {
-        localStorage.setItem("refresh_token", tokens.refresh_token)
-      }
-      return tokens.access_token
-    } catch {
-      return null
+      return { ok: false, reason: "network" }
     } finally {
       refreshPromise = null
     }
   })()
 
   return refreshPromise
+}
+
+/** Обновить access token до запроса, если есть refresh, но access потерян/истёк. */
+export async function ensureAccessToken(): Promise<RefreshResult | null> {
+  if (getAccessToken()) return null
+  if (typeof window === "undefined") return null
+  if (!localStorage.getItem("refresh_token")) return null
+  return refreshAccessToken()
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +187,30 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return (await response.json()) as T
 }
 
+async function retryAfterUnauthorized(
+  doFetch: () => Promise<Response>
+): Promise<Response> {
+  const refresh = await refreshAccessToken()
+
+  if (!refresh.ok) {
+    handleRefreshFailure(refresh)
+    const probe = await doFetch()
+    if (probe.status !== 401) {
+      return probe
+    }
+    await throwApiError(probe)
+  }
+
+  const retryResponse = await doFetch()
+
+  if (retryResponse.status === 401) {
+    notifySessionExpired()
+    await throwApiError(retryResponse)
+  }
+
+  return retryResponse
+}
+
 /** Multipart/form-data (file uploads). Do not set Content-Type manually. */
 export async function apiFormRequest<T>(
   path: string,
@@ -120,27 +228,17 @@ export async function apiFormRequest<T>(
       body: formData,
     })
 
+  if (typeof window !== "undefined") {
+    const pre = await ensureAccessToken()
+    if (pre && !pre.ok) {
+      handleRefreshFailure(pre)
+    }
+  }
+
   let response = await doFetch()
 
   if (response.status === 401) {
-    const newToken = await refreshAccessToken()
-    if (!newToken) {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("refresh_token")
-        setAccessToken(null)
-        window.location.href = "/auth/login"
-      }
-      await throwApiError(response)
-    }
-    response = await doFetch()
-    if (response.status === 401) {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("refresh_token")
-        setAccessToken(null)
-        window.location.href = "/auth/login"
-      }
-      await throwApiError(response)
-    }
+    response = await retryAfterUnauthorized(doFetch)
   }
 
   return handleResponse<T>(response)
@@ -175,54 +273,30 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const url = `${API_BASE_URL}${path}`
 
+  if (typeof window !== "undefined") {
+    const pre = await ensureAccessToken()
+    if (pre && !pre.ok) {
+      handleRefreshFailure(pre)
+    }
+  }
+
+  const doFetch = () =>
+    fetch(url, {
+      ...init,
+      headers: buildHeaders(init),
+    })
+
   // --- Attempt the request, retrying once after 2 s on network error ---
   let response: Response
   try {
-    response = await fetch(url, {
-      ...init,
-      headers: buildHeaders(init),
-    })
+    response = await doFetch()
   } catch {
-    // Network error — wait 2 s then retry once
     await new Promise<void>((resolve) => setTimeout(resolve, 2000))
-    response = await fetch(url, {
-      ...init,
-      headers: buildHeaders(init),
-    })
-    // If this second attempt also throws, the error propagates to the caller.
+    response = await doFetch()
   }
 
-  // --- Handle 401: attempt token refresh exactly once, then retry ---
   if (response.status === 401) {
-    const newToken = await refreshAccessToken()
-
-    if (!newToken) {
-      // Refresh failed — clear auth state and redirect to login
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("refresh_token")
-        setAccessToken(null)
-        window.location.href = "/auth/login"
-      }
-      await throwApiError(response)
-    }
-
-    // Retry the original request with the new token
-    const retryResponse = await fetch(url, {
-      ...init,
-      headers: buildHeaders(init),
-    })
-
-    if (retryResponse.status === 401) {
-      // Refresh token itself is invalid — clear auth state and redirect
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("refresh_token")
-        setAccessToken(null)
-        window.location.href = "/auth/login"
-      }
-      await throwApiError(retryResponse)
-    }
-
-    response = retryResponse
+    response = await retryAfterUnauthorized(doFetch)
   }
 
   return handleResponse<T>(response)

@@ -1,4 +1,5 @@
 import { apiFormRequest, apiRequest } from "@/lib/api-client"
+import { serializeProfilePatch, type ProfilePatchInput, type ProfileRole } from "@/lib/profile-patch"
 import { normalizeChatSummary, normalizeChatDetail, normalizeMeResponse, normalizeMessage } from "./normalize"
 import type {
   Chat,
@@ -66,10 +67,17 @@ export async function getProfile(): Promise<ProfileResponse> {
   return apiRequest<ProfileResponse>("/api/v1/profile")
 }
 
-export async function updateProfile(body: UpdateProfileRequest): Promise<ProfileResponse> {
+export async function updateProfile(
+  body: ProfilePatchInput | UpdateProfileRequest,
+  role?: ProfileRole
+): Promise<ProfileResponse> {
+  const payload = serializeProfilePatch(body as ProfilePatchInput, role)
+  if (Object.keys(payload).length === 0) {
+    return getProfile()
+  }
   return apiRequest<ProfileResponse>("/api/v1/profile", {
     method: "PATCH",
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   })
 }
 

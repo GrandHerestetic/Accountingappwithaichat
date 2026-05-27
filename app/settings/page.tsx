@@ -21,7 +21,7 @@ import {
 } from "@/lib/form-errors"
 import { toast } from "sonner"
 
-type SettingsField = "display_name" | "phone" | "about" | "company_name"
+type SettingsField = "display_name" | "phone" | "about" | "company_name" | "location"
 
 export default function SettingsPage() {
   const { user, refreshUser } = useAuth()
@@ -36,24 +36,31 @@ export default function SettingsPage() {
     phone: "",
     about: "",
     company_name: "",
+    location: "",
   })
 
   useEffect(() => {
     getProfile()
       .then((p) => {
         setForm({
-          display_name: String(p.display_name ?? p.profile_name ?? user?.profile?.profile_name ?? ""),
+          display_name: String(
+            p.profile_name ?? p.contact_name ?? p.display_name ?? user?.profile?.profile_name ?? ""
+          ),
           phone: String(p.phone ?? ""),
           about: String(p.about ?? p.bio ?? ""),
           company_name: String(p.company_name ?? ""),
+          location: String(p.city ?? p.address ?? ""),
         })
       })
       .catch(() => {
         setForm({
-          display_name: user?.profile?.profile_name ?? "",
+          display_name: String(
+            user?.profile?.profile_name ?? user?.profile?.company_name ?? ""
+          ),
           phone: String(user?.profile?.phone ?? ""),
-          about: String(user?.profile?.about ?? ""),
+          about: String(user?.profile?.about ?? user?.profile?.bio ?? ""),
           company_name: String(user?.profile?.company_name ?? ""),
+          location: String(user?.profile?.city ?? user?.profile?.address ?? ""),
         })
       })
       .finally(() => setLoading(false))
@@ -87,11 +94,25 @@ export default function SettingsPage() {
 
     setSaving(true)
     try {
-      await updateProfile({
-        display_name: form.display_name.trim(),
-        phone: form.phone.trim(),
-        about: form.about.trim(),
-        company_name: form.company_name.trim(),
+      const updated = await updateProfile(
+        {
+          profile_name: form.display_name.trim(),
+          contact_name: form.display_name.trim(),
+          company_name: form.company_name.trim(),
+          phone: form.phone.trim(),
+          about: form.about.trim(),
+          location: form.location.trim(),
+        },
+        user?.role
+      )
+      setForm({
+        display_name: String(
+          updated.profile_name ?? updated.contact_name ?? updated.company_name ?? form.display_name
+        ),
+        phone: String(updated.phone ?? form.phone),
+        about: String(updated.about ?? updated.bio ?? form.about),
+        company_name: String(updated.company_name ?? form.company_name),
+        location: String(updated.city ?? updated.address ?? form.location),
       })
       await refreshUser()
       toast.success("Профиль сохранён")
@@ -194,6 +215,16 @@ export default function SettingsPage() {
                     {...fieldAriaProps(errors.about, "about")}
                   />
                 </FormField>
+                {(user?.role === "client" || user?.role === "executor") && (
+                  <FormField label="Местоположение" htmlFor="location">
+                    <Input
+                      id="location"
+                      value={form.location}
+                      onChange={(e) => updateForm("location", e.target.value)}
+                      placeholder={user?.role === "client" ? "Адрес / город" : "Город"}
+                    />
+                  </FormField>
+                )}
                 <Button onClick={handleSave} disabled={saving}>
                   {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                   Сохранить
