@@ -28,7 +28,8 @@ export function ProtectedRoute({ children, allowedRoles, redirectTo = "/auth/log
     }
   }, [isAuthenticated, user, allowedRoles, router, redirectTo, isLoading])
 
-  if (isLoading) {
+  // Session restore can lag behind a fresh login — don't block UI when already authenticated.
+  if (isLoading && !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

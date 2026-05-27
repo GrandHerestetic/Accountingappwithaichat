@@ -24,7 +24,6 @@ import {
   Info,
   BarChart3,
   Users,
-  Wallet,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -335,13 +334,6 @@ export function Navigation() {
                         <Link href="/settings">
                           <Settings className="mr-2 h-4 w-4" />
                           Настройки
-                        </Link>
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem asChild>
-                        <Link href="/wallet">
-                          <Wallet className="mr-2 h-4 w-4" />
-                          Кошелек
                         </Link>
                       </DropdownMenuItem>
 

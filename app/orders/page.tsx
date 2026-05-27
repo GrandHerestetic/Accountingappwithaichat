@@ -41,7 +41,7 @@ const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
 
 const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   draft: "Черновик",
-  payment_pending: "Ожидает оплаты",
+  payment_pending: "Черновик",
   published: "Опубликован",
   in_progress: "В работе",
   completed: "Завершён",

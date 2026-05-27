@@ -143,7 +143,7 @@ export default function SupportPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="technical">Техническая проблема</SelectItem>
-                      <SelectItem value="payment">Вопрос по оплате</SelectItem>
+                      <SelectItem value="billing">Вопрос по тарифам</SelectItem>
                       <SelectItem value="account">Проблемы с аккаунтом</SelectItem>
                       <SelectItem value="verification">Верификация документов</SelectItem>
                       <SelectItem value="rating">Вопросы по рейтингу</SelectItem>

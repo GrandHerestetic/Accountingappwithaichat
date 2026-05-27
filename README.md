@@ -52,10 +52,7 @@ NEXT_PUBLIC_FIREBASE_APP_ID=
 Point `NEXT_PUBLIC_API_URL` at the Go API (default `http://localhost:8080`). The frontend targets **`backend/diploma`**, not `diploma-main`.
 
 - **Executor registration:** `POST /api/v1/leads/executor` (multipart + documents), then admin approves the lead.
-- **Payments:** `PAYMENTS_PROVIDER=mock` or `yookassa`. Mock does not auto-publish orders — for local E2E set `ENABLE_DEV_PAYMENT_ENDPOINTS=true` and confirm via `POST /api/v1/dev/payments/:transactionId/confirm` (admin), or use the YooKassa webhook.
-- **Migrations:** if order submit returns 500, run `go run ./cmd/migrate -database-url="$DB_URL"` in `backend/diploma` (needs `000016` for `yookassa_payment_id`).
-
-Submit flows redirect to checkout in the **same tab** (`lib/payment.ts`); return page: `/payment/return`.
+- **Платежи отключены на сайте:** публикация заказов и отправка откликов выполняются сразу, без checkout.
 
 ### Build for Production
 

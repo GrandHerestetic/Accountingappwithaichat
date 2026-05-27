@@ -20,7 +20,6 @@ import {
   listMyOrders,
   listMyResponses,
   listOrders,
-  getMyWallet,
 } from "@/lib/api"
 import type {
   Order,
@@ -32,7 +31,6 @@ import type {
   PaginatedResponse,
   ExecutorLeadView,
   Sanction,
-  WalletResponse,
 } from "@/lib/api/types"
 
 // ─── Orders (public feed) ─────────────────────────────────────────────────────
@@ -76,7 +74,11 @@ export function useMyOrders(params?: { page?: number; pageSize?: number }) {
   return useSWR<PaginatedResponse<Order>>(
     ["my-orders", searchParams.toString()],
     () => listMyOrders({ page: params?.page, pageSize: params?.pageSize }),
-    { revalidateOnFocus: true }
+    {
+      revalidateOnFocus: true,
+      shouldRetryOnError: true,
+      errorRetryCount: 2,
+    }
   )
 }
 
@@ -200,12 +202,5 @@ export function useAdminSanctions(params?: { page?: number; pageSize?: number })
   const key = `admin-sanctions-${params?.page ?? 1}`
   return useSWR<PaginatedResponse<Sanction>>(key, () => listAdminSanctions(params), {
     revalidateOnFocus: true,
-  })
-}
-
-export function useMyWallet() {
-  return useSWR<WalletResponse>("my-wallet", getMyWallet, {
-    revalidateOnFocus: false,
-    shouldRetryOnError: false,
   })
 }

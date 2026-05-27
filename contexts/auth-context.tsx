@@ -66,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     persistTokens(tokens)
     await refreshUser()
+    setIsLoading(false)
   }
 
   const logout = async (): Promise<void> => {
@@ -92,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     persistTokens(tokens)
     await refreshUser()
+    setIsLoading(false)
   }
 
   return (

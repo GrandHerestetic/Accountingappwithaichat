@@ -33,7 +33,7 @@ const RESPONSE_STATUS_COLORS: Record<ResponseStatus, string> = {
 
 const RESPONSE_STATUS_LABELS: Record<ResponseStatus, string> = {
   draft: "Черновик",
-  payment_pending: "Ожидает оплаты",
+  payment_pending: "Черновик",
   submitted: "Отправлен",
   accepted: "Принят",
   rejected: "Отклонён",

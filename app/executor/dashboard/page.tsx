@@ -76,7 +76,7 @@ export default function ExecutorDashboard() {
       case "rejected":
         return <Badge className="bg-red-100 text-red-800">Отклонён</Badge>
       case "payment_pending":
-        return <Badge className="bg-yellow-100 text-yellow-800">Оплата</Badge>
+        return <Badge className="bg-yellow-100 text-yellow-800">Черновик</Badge>
       default:
         return <Badge variant="secondary">{status}</Badge>
     }

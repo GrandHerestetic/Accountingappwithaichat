@@ -27,7 +27,6 @@ import {
   updateMyResponse,
 } from "@/lib/api"
 import type { OrderResponse, ResponseStatus, PaginatedResponse } from "@/lib/api/types"
-import { redirectToCheckout } from "@/lib/payment"
 
 // ─── Req 4.8: distinct badge colors per response status ─────────────────────
 const RESPONSE_STATUS_COLORS: Record<ResponseStatus, string> = {
@@ -41,7 +40,7 @@ const RESPONSE_STATUS_COLORS: Record<ResponseStatus, string> = {
 
 const RESPONSE_STATUS_LABELS: Record<ResponseStatus, string> = {
   draft: "Черновик",
-  payment_pending: "Ожидает оплаты",
+  payment_pending: "Черновик",
   submitted: "Отправлен",
   accepted: "Принят",
   rejected: "Отклонён",
@@ -71,7 +70,7 @@ export default function ExecutorResponsesPage() {
   })
   const [isSavingEdit, setIsSavingEdit] = useState(false)
 
-  // Submit for payment in-progress (Req 4.4)
+  // Submit draft in-progress
   const [submittingId, setSubmittingId] = useState<string | null>(null)
 
   // ── Req 4.2: fetch my responses ───────────────────────────────────────────
@@ -147,7 +146,7 @@ export default function ExecutorResponsesPage() {
     }
   }
 
-  // ── Req 4.4: submit draft response for payment ────────────────────────────
+  // ── Submit draft response ─────────────────────────────────────────────────
   const handleCancelResponse = async (response: OrderResponse) => {
     if (!confirm("Отменить черновик отклика?")) return
     setSubmittingId(response.id)
@@ -162,19 +161,14 @@ export default function ExecutorResponsesPage() {
     }
   }
 
-  const handleSubmitForPayment = async (response: OrderResponse) => {
+  const handleSubmitResponse = async (response: OrderResponse) => {
     setSubmittingId(response.id)
     try {
-      const result = await submitMyResponse(response.order_id, response.id)
-      if (result?.checkout_url) {
-        redirectToCheckout(result.checkout_url, "/executor/responses")
-        return
-      }
-      toast.success("Отклик отправлен на оплату!")
+      await submitMyResponse(response.order_id, response.id)
+      toast.success("Отклик отправлен!")
       await fetchResponses()
     } catch (err: unknown) {
-      // Req 4.9: error toast on API failure
-      const message = err instanceof Error ? err.message : "Не удалось отправить отклик на оплату"
+      const message = err instanceof Error ? err.message : "Не удалось отправить отклик"
       toast.error(message)
     } finally {
       setSubmittingId(null)
@@ -227,9 +221,6 @@ export default function ExecutorResponsesPage() {
                                 <Calendar className="w-4 h-4" />
                                 {new Date(response.created_at).toLocaleDateString("ru-RU")}
                               </span>
-                              {response.is_paid && (
-                                <Badge className="bg-green-100 text-green-700">Оплачен</Badge>
-                              )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -270,10 +261,9 @@ export default function ExecutorResponsesPage() {
                                   <Pencil className="w-4 h-4 mr-2" />
                                   Редактировать
                                 </Button>
-                                {/* Req 4.4: submit draft for payment */}
                                 <Button
                                   className="w-full bg-green-600 hover:bg-green-700"
-                                  onClick={() => handleSubmitForPayment(response)}
+                                  onClick={() => handleSubmitResponse(response)}
                                   disabled={submittingId === response.id}
                                 >
                                   <Send className="w-4 h-4 mr-2" />

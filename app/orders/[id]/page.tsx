@@ -15,7 +15,7 @@ import { toast } from "sonner"
 
 const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   draft: "Черновик",
-  payment_pending: "Ожидает оплаты",
+  payment_pending: "Черновик",
   published: "Опубликован",
   in_progress: "В работе",
   completed: "Завершён",

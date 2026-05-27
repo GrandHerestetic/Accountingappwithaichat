@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -36,15 +36,10 @@ import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/contexts/auth-context"
-import {
-  cancelMyOrder,
-  listMyOrders,
-  submitMyOrder,
-  updateMyOrder,
-} from "@/lib/api"
+import { cancelMyOrder, submitMyOrder, updateMyOrder } from "@/lib/api"
 import type { Order, OrderStatus } from "@/lib/api/types"
+import { useMyOrders } from "@/hooks/use-swr-hooks"
 import { toast } from "sonner"
-import { redirectToCheckout } from "@/lib/payment"
 
 // ─── Status badge colors (Req 3.8) ──────────────────────────────────────────
 const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
@@ -59,7 +54,7 @@ const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
 
 const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   draft: "Черновик",
-  payment_pending: "Ожидает оплаты",
+  payment_pending: "Черновик",
   published: "Опубликован",
   in_progress: "В работе",
   completed: "Завершён",
@@ -80,9 +75,11 @@ export default function ClientDashboard() {
   const [activeTab, setActiveTab] = useState("active")
   const { user } = useAuth()
 
-  const [orders, setOrders] = useState<Order[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [page] = useState(1)
+  const { data: ordersData, isLoading, mutate: refreshOrders } = useMyOrders({
+    page: 1,
+    pageSize: 20,
+  })
+  const orders = ordersData?.items ?? []
 
   // Cancel confirmation dialog
   const [cancelDialog, setCancelDialog] = useState<{ open: boolean; orderId: string | null }>({
@@ -104,24 +101,6 @@ export default function ClientDashboard() {
   // Submit in-progress
   const [submittingId, setSubmittingId] = useState<string | null>(null)
 
-  // ── Fetch orders (Req 3.2) ─────────────────────────────────────────────────
-  const fetchOrders = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const data = await listMyOrders({ page, pageSize: 20 })
-      setOrders(data.items)
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Не удалось загрузить заказы"
-      toast.error(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [page])
-
-  useEffect(() => {
-    fetchOrders()
-  }, [fetchOrders])
-
   // ── Derived stats ──────────────────────────────────────────────────────────
   const stats = {
     activeOrders: orders.filter((o) => o.status === "published" || o.status === "in_progress").length,
@@ -131,20 +110,21 @@ export default function ClientDashboard() {
 
   // ── Status badge ───────────────────────────────────────────────────────────
   const getStatusBadge = (status: OrderStatus) => (
-    <Badge className={ORDER_STATUS_COLORS[status]}>{ORDER_STATUS_LABELS[status]}</Badge>
+    <Badge className={ORDER_STATUS_COLORS[status] ?? "bg-gray-100 text-gray-700"}>
+      {ORDER_STATUS_LABELS[status] ?? status}
+    </Badge>
   )
+
+  const formatBudget = (amount: number | undefined) =>
+    Number(amount ?? 0).toLocaleString("ru-RU")
 
   // ── Submit order (Req 3.4, 3.5) ────────────────────────────────────────────
   const handleSubmitOrder = async (orderId: string) => {
     setSubmittingId(orderId)
     try {
-      const result = await submitMyOrder(orderId)
-      if (result?.checkout_url) {
-        redirectToCheckout(result.checkout_url, "/client/dashboard")
-        return
-      }
-      toast.success("Заказ отправлен на публикацию!")
-      await fetchOrders()
+      await submitMyOrder(orderId)
+      toast.success("Заказ опубликован!")
+      await refreshOrders()
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Не удалось отправить заказ"
       toast.error(message)
@@ -165,7 +145,7 @@ export default function ClientDashboard() {
       await cancelMyOrder(cancelDialog.orderId)
       toast.success("Заказ отменён")
       setCancelDialog({ open: false, orderId: null })
-      await fetchOrders()
+      await refreshOrders()
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Не удалось отменить заказ"
       toast.error(message)
@@ -204,7 +184,7 @@ export default function ClientDashboard() {
       await updateMyOrder(editState.order.id, patch)
       toast.success("Заказ обновлён")
       setEditState((s) => ({ ...s, open: false }))
-      await fetchOrders()
+      await refreshOrders()
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Не удалось обновить заказ"
       toast.error(message)
@@ -346,7 +326,7 @@ export default function ClientDashboard() {
                                     {new Date(order.created_at).toLocaleDateString("ru-RU")}
                                   </span>
                                   <span>{order.category_slug}</span>
-                                  <span>{order.budget_amount.toLocaleString()} ₸</span>
+                                  <span>{formatBudget(order.budget_amount)} ₸</span>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2 mb-3">
                                   {getStatusBadge(order.status)}
@@ -364,7 +344,7 @@ export default function ClientDashboard() {
                                       Отклики
                                     </Button>
                                   </Link>
-                                  {order.status === "draft" && (
+                                  {(order.status === "draft" || order.status === "payment_pending") && (
                                     <>
                                       <Button
                                         variant="outline"
@@ -420,7 +400,7 @@ export default function ClientDashboard() {
                                     {new Date(order.updated_at).toLocaleDateString("ru-RU")}
                                   </span>
                                   <span>{order.category_slug}</span>
-                                  <span>{order.budget_amount.toLocaleString()} ₸</span>
+                                  <span>{formatBudget(order.budget_amount)} ₸</span>
                                 </div>
                                 {getStatusBadge(order.status)}
                               </div>
@@ -472,7 +452,7 @@ export default function ClientDashboard() {
                                     {new Date(order.updated_at).toLocaleDateString("ru-RU")}
                                   </span>
                                   <span>{order.category_slug}</span>
-                                  <span>{order.budget_amount.toLocaleString()} ₸</span>
+                                  <span>{formatBudget(order.budget_amount)} ₸</span>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2 mb-2">
                                   {getStatusBadge(order.status)}

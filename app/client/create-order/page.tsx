@@ -8,12 +8,10 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Calendar, MapPin, DollarSign, TrendingUp, Pin, Palette, CreditCard } from "lucide-react"
+import { Calendar, MapPin, DollarSign, TrendingUp, Pin, Palette } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { createOrder, submitMyOrder } from "@/lib/api"
-import { redirectToCheckout } from "@/lib/payment"
 import type { CreateOrderRequest, Order } from "@/lib/api/types"
 import { ORDER_CATEGORIES } from "@/lib/order-categories"
 import { FormField, fieldAriaProps, fieldInputClass } from "@/components/form-field"
@@ -94,15 +92,6 @@ export default function CreateOrder() {
     )
   }
 
-  const calculateTotal = () => {
-    const basePrice = 2500
-    const promotionPrice = selectedPromotions.reduce((total, promoId) => {
-      const promo = promotionOptions.find((p) => p.id === promoId)
-      return total + (promo?.price || 0)
-    }, 0)
-    return basePrice + promotionPrice
-  }
-
   const handleSubmit = async () => {
     const categorySlug =
       categories.find((c) => c.label === selectedCategory)?.slug ?? selectedCategory
@@ -135,15 +124,10 @@ export default function CreateOrder() {
     try {
       const order = await createOrder(payload)
 
-      const submitResult = await submitMyOrder(order.id)
+      await submitMyOrder(order.id)
 
-      if (submitResult?.checkout_url) {
-        redirectToCheckout(submitResult.checkout_url, "/client/dashboard")
-        return
-      }
-
-      toast.success("Заказ успешно создан!")
-      router.push("/client/dashboard")
+      toast.success("Заказ опубликован!")
+      router.replace("/client/dashboard")
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Не удалось создать заказ"
       toast.error(message)
@@ -330,9 +314,7 @@ export default function CreateOrder() {
                                 <p className="text-sm text-gray-600 mt-1">{option.description}</p>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <Badge variant={isSelected ? "default" : "secondary"}>{option.price} ₸</Badge>
-                            </div>
+                            {isSelected && <Badge variant="default">Выбрано</Badge>}
                           </div>
                         </div>
                       )
@@ -341,69 +323,28 @@ export default function CreateOrder() {
                 </Card>
               </div>
 
-              {/* Order Summary */}
+              {/* Publish */}
               <div className="lg:col-span-1">
                 <Card className="sticky top-8">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <CreditCard className="w-5 h-5" />
-                      Итого к оплате
-                    </CardTitle>
+                    <CardTitle>Готово к публикации</CardTitle>
+                    <CardDescription>Заказ сразу появится в ленте для исполнителей</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span>Размещение заказа</span>
-                        <span className="font-medium">2500 ₸</span>
-                      </div>
-
-                      {selectedPromotions.map((promoId) => {
-                        const promo = promotionOptions.find((p) => p.id === promoId)
-                        if (!promo) return null
-
-                        return (
-                          <div key={promoId} className="flex justify-between text-sm">
-                            <span className="text-gray-600">{promo.name}</span>
-                            <span className="font-medium">{promo.price} ₸</span>
-                          </div>
-                        )
-                      })}
-
-                      <Separator />
-
-                      <div className="flex justify-between text-lg font-bold">
-                        <span>Общая сумма</span>
-                        <span className="text-blue-600">{calculateTotal()} ₸</span>
-                      </div>
+                    <div className="text-sm text-gray-600 space-y-2">
+                      <p>После публикации исполнители смогут откликаться на заказ.</p>
+                      {selectedPromotions.length > 0 && (
+                        <p>Выбранные опции продвижения будут применены автоматически.</p>
+                      )}
                     </div>
-
-                    <div className="space-y-3 pt-4">
-                      <div className="text-sm text-gray-600">
-                        <h4 className="font-medium mb-2">Что вы получите:</h4>
-                        <ul className="space-y-1">
-                          <li>• Публикация заказа на 30 дней</li>
-                          <li>• Неограниченное количество откликов</li>
-                          <li>• Чат с исполнителями</li>
-                          <li>• Просмотр профилей и рейтингов</li>
-                          {selectedPromotions.includes("top") && <li>• Размещение в ТОП на 3 дня</li>}
-                          {selectedPromotions.includes("highlight") && <li>• Цветное выделение</li>}
-                          {selectedPromotions.includes("pin") && <li>• Закрепление заказа</li>}
-                        </ul>
-                      </div>
-                    </div>
-
                     <Button
                       className="w-full bg-blue-600 hover:bg-blue-700"
                       size="lg"
                       onClick={handleSubmit}
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? "Создание..." : "Перейти к оплате"}
+                      {isSubmitting ? "Публикация..." : "Опубликовать заказ"}
                     </Button>
-
-                    <p className="text-xs text-gray-500 text-center">
-                      Нажимая кнопку, вы соглашаетесь с условиями размещения заказа
-                    </p>
                   </CardContent>
                 </Card>
               </div>

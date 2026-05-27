@@ -24,8 +24,8 @@ export default function FeaturesPage() {
   const features = [
     {
       icon: Shield,
-      title: "Безопасные сделки",
-      description: "Система эскроу защищает ваши средства до завершения работы",
+      title: "Прозрачные сделки",
+      description: "Статусы заказов, отклики и переписка в одном месте — без лишних шагов",
       color: "bg-green-100 text-green-600",
     },
     {
@@ -54,8 +54,8 @@ export default function FeaturesPage() {
     },
     {
       icon: CreditCard,
-      title: "Удобная оплата",
-      description: "Множество способов оплаты и автоматические расчеты",
+      title: "Быстрая публикация",
+      description: "Заказы и отклики публикуются сразу, без лишних шагов",
       color: "bg-red-100 text-red-600",
     },
     {
@@ -73,7 +73,7 @@ export default function FeaturesPage() {
     {
       icon: CheckCircle,
       title: "Гарантия качества",
-      description: "Возврат средств при невыполнении условий договора",
+      description: "Рейтинги, отзывы и модерация помогают выбрать надёжного исполнителя",
       color: "bg-emerald-100 text-emerald-600",
     },
     {

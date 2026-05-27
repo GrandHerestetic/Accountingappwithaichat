@@ -14,7 +14,6 @@ import type {
   CreateReviewRequest,
   AttachmentTargetType,
   AttachmentView,
-  CreditWalletRequest,
   EntityRatingSummary,
   EntityReview,
   ExecutorLeadSubmittedResponse,
@@ -38,7 +37,6 @@ import type {
   UpdateProfileRequest,
   UpdateResponseRequest,
   UserProfile,
-  WalletResponse,
   StorageUploadResponse,
 } from "./types"
 import { ApiError } from "./types"
@@ -110,9 +108,15 @@ export async function listOrders(params?: ListParams & {
 }
 
 export async function listMyOrders(params?: ListParams): Promise<PaginatedResponse<Order>> {
-  return apiRequest(
+  const data = await apiRequest<PaginatedResponse<Order>>(
     `/api/v1/orders/my${qs({ page: params?.page ?? 1, page_size: params?.pageSize ?? 20 })}`
   )
+  return {
+    items: Array.isArray(data?.items) ? data.items : [],
+    page: data?.page ?? params?.page ?? 1,
+    page_size: data?.page_size ?? params?.pageSize ?? 20,
+    total: data?.total ?? 0,
+  }
 }
 
 export async function getOrder(id: string): Promise<Order> {
@@ -149,29 +153,8 @@ export async function updateMyOrder(id: string, body: UpdateOrderRequest): Promi
   })
 }
 
-export async function submitMyOrder(id: string): Promise<{
-  checkout_url?: string
-  transaction_id?: string
-  total_charge?: number
-}> {
-  const data = await apiRequest<{
-    checkout_url?: string
-    payment?: {
-      checkout_url?: string
-      confirmation_url?: string
-      transaction_id?: string
-      amount?: number
-    }
-  }>(`/api/v1/orders/my/${id}/submit`, { method: "POST" })
-  const payment = data.payment
-  return {
-    checkout_url:
-      data.checkout_url ??
-      payment?.checkout_url ??
-      payment?.confirmation_url,
-    transaction_id: payment?.transaction_id,
-    total_charge: payment?.amount,
-  }
+export async function submitMyOrder(id: string): Promise<void> {
+  await apiRequest(`/api/v1/orders/my/${id}/submit`, { method: "POST" })
 }
 
 export async function cancelMyOrder(id: string): Promise<void> {
@@ -269,10 +252,14 @@ export async function createOrderResponse(
   orderId: string,
   body: { proposed_amount: number; cover_letter: string; currency?: string; proposed_deadline?: string }
 ): Promise<{ id: string; status: string }> {
-  return apiRequest(`/api/v1/orders/${orderId}/responses`, {
+  const res = await apiRequest<{ id: string; status: string }>(`/api/v1/orders/${orderId}/responses`, {
     method: "POST",
     body: JSON.stringify(buildResponsePayload(body)),
   })
+  if (!res?.id) {
+    throw new ApiError("Сервер не вернул идентификатор отклика", 500, "invalid_response")
+  }
+  return { id: res.id, status: res.status }
 }
 
 export async function saveOrderResponseDraft(
@@ -331,26 +318,10 @@ export async function updateMyResponse(
   })
 }
 
-export async function submitMyResponse(
-  orderId: string,
-  responseId: string
-): Promise<{ checkout_url?: string; transaction_id?: string }> {
-  const data = await apiRequest<{
-    checkout_url?: string
-    payment?: {
-      checkout_url?: string
-      confirmation_url?: string
-      transaction_id?: string
-    }
-  }>(`/api/v1/orders/${orderId}/responses/my/${responseId}/submit`, { method: "POST" })
-  const payment = data.payment
-  return {
-    checkout_url:
-      data.checkout_url ??
-      payment?.checkout_url ??
-      payment?.confirmation_url,
-    transaction_id: payment?.transaction_id,
-  }
+export async function submitMyResponse(orderId: string, responseId: string): Promise<void> {
+  await apiRequest(`/api/v1/orders/${orderId}/responses/my/${responseId}/submit`, {
+    method: "POST",
+  })
 }
 
 export async function cancelMyResponse(orderId: string, responseId: string): Promise<void> {
@@ -381,28 +352,6 @@ export async function listMySanctions(params?: ListParams): Promise<PaginatedRes
 
 export async function getMyResponse(responseId: string): Promise<OrderResponse> {
   return apiRequest(`/api/v1/my/responses/${responseId}`)
-}
-
-// ─── Wallet ───────────────────────────────────────────────────────────────────
-
-/** @deprecated Not in backend v2 router */
-export async function getMyWallet(): Promise<WalletResponse> {
-  throw new ApiError("Кошелёк недоступен в текущей версии API", 501, "not_implemented")
-}
-
-export async function getAdminWallet(userId: string): Promise<WalletResponse> {
-  return apiRequest<WalletResponse>(`/api/v1/admin/wallets/${userId}`)
-}
-
-export async function creditAdminWallet(
-  userId: string,
-  body: CreditWalletRequest
-): Promise<WalletResponse> {
-  await apiRequest(`/api/v1/admin/wallets/${userId}/credit`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  })
-  return getAdminWallet(userId)
 }
 
 // ─── Generic reviews & ratings ──────────────────────────────────────────────
