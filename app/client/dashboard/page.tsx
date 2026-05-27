@@ -44,6 +44,7 @@ import {
 } from "@/lib/api"
 import type { Order, OrderStatus } from "@/lib/api/types"
 import { toast } from "sonner"
+import { redirectToCheckout } from "@/lib/payment"
 
 // ─── Status badge colors (Req 3.8) ──────────────────────────────────────────
 const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
@@ -139,11 +140,11 @@ export default function ClientDashboard() {
     try {
       const result = await submitMyOrder(orderId)
       if (result?.checkout_url) {
-        window.open(result.checkout_url, "_blank")
-      } else {
-        toast.success("Заказ отправлен на публикацию!")
-        await fetchOrders()
+        redirectToCheckout(result.checkout_url, "/client/dashboard")
+        return
       }
+      toast.success("Заказ отправлен на публикацию!")
+      await fetchOrders()
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Не удалось отправить заказ"
       toast.error(message)

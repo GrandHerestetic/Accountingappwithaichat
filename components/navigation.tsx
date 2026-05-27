@@ -173,6 +173,18 @@ export function Navigation() {
             icon: Search,
             active: isActive("/executor/orders"),
           },
+          {
+            href: "/executor/responses",
+            label: "Мои отклики",
+            icon: FileText,
+            active: pathname.startsWith("/executor/responses"),
+          },
+          {
+            href: "/executor/courses",
+            label: "Мои курсы",
+            icon: BookOpen,
+            active: pathname.startsWith("/executor/courses"),
+          },
         ]
       case "coach":
         return [

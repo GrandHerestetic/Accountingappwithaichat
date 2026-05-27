@@ -13,6 +13,7 @@ import { Calendar, MapPin, DollarSign, TrendingUp, Pin, Palette, CreditCard } fr
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { createOrder, submitMyOrder } from "@/lib/api"
+import { redirectToCheckout } from "@/lib/payment"
 import type { CreateOrderRequest, Order } from "@/lib/api/types"
 import { ORDER_CATEGORIES } from "@/lib/order-categories"
 import { FormField, fieldAriaProps, fieldInputClass } from "@/components/form-field"
@@ -137,11 +138,11 @@ export default function CreateOrder() {
       const submitResult = await submitMyOrder(order.id)
 
       if (submitResult?.checkout_url) {
-        window.open(submitResult.checkout_url, "_blank")
-      } else {
-        toast.success("Заказ успешно создан!")
+        redirectToCheckout(submitResult.checkout_url, "/client/dashboard")
+        return
       }
 
+      toast.success("Заказ успешно создан!")
       router.push("/client/dashboard")
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Не удалось создать заказ"

@@ -149,12 +149,29 @@ export async function updateMyOrder(id: string, body: UpdateOrderRequest): Promi
   })
 }
 
-export async function submitMyOrder(id: string): Promise<{ checkout_url?: string }> {
+export async function submitMyOrder(id: string): Promise<{
+  checkout_url?: string
+  transaction_id?: string
+  total_charge?: number
+}> {
   const data = await apiRequest<{
     checkout_url?: string
-    payment?: { checkout_url?: string }
+    payment?: {
+      checkout_url?: string
+      confirmation_url?: string
+      transaction_id?: string
+      amount?: number
+    }
   }>(`/api/v1/orders/my/${id}/submit`, { method: "POST" })
-  return { checkout_url: data.checkout_url ?? data.payment?.checkout_url }
+  const payment = data.payment
+  return {
+    checkout_url:
+      data.checkout_url ??
+      payment?.checkout_url ??
+      payment?.confirmation_url,
+    transaction_id: payment?.transaction_id,
+    total_charge: payment?.amount,
+  }
 }
 
 export async function cancelMyOrder(id: string): Promise<void> {
@@ -317,12 +334,23 @@ export async function updateMyResponse(
 export async function submitMyResponse(
   orderId: string,
   responseId: string
-): Promise<{ checkout_url?: string }> {
+): Promise<{ checkout_url?: string; transaction_id?: string }> {
   const data = await apiRequest<{
     checkout_url?: string
-    payment?: { checkout_url?: string }
+    payment?: {
+      checkout_url?: string
+      confirmation_url?: string
+      transaction_id?: string
+    }
   }>(`/api/v1/orders/${orderId}/responses/my/${responseId}/submit`, { method: "POST" })
-  return { checkout_url: data.checkout_url ?? data.payment?.checkout_url }
+  const payment = data.payment
+  return {
+    checkout_url:
+      data.checkout_url ??
+      payment?.checkout_url ??
+      payment?.confirmation_url,
+    transaction_id: payment?.transaction_id,
+  }
 }
 
 export async function cancelMyResponse(orderId: string, responseId: string): Promise<void> {
@@ -504,15 +532,11 @@ export async function uploadAndAttach(
   return uploads
 }
 
-/** @deprecated Use register() with role executor */
+/** Public multipart registration for executors (diploma backend). */
 export async function submitExecutorLead(
-  _formData: FormData
+  formData: FormData
 ): Promise<ExecutorLeadSubmittedResponse> {
-  throw new ApiError(
-    "Регистрация через заявку отключена. Используйте стандартную регистрацию исполнителя.",
-    501,
-    "not_implemented"
-  )
+  return apiFormRequest<ExecutorLeadSubmittedResponse>("/api/v1/leads/executor", formData)
 }
 
 // ─── Chats ────────────────────────────────────────────────────────────────────
@@ -795,12 +819,16 @@ export async function markCourseAssignmentCompleted(id: string): Promise<void> {
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
-/** @deprecated Not in backend v2 — returns empty list for legacy UI */
 export async function listAdminExecutorLeads(
   params?: ListParams & { status?: string }
 ): Promise<PaginatedResponse<ExecutorLeadView>> {
-  void params
-  return { items: [], page: params?.page ?? 1, page_size: params?.pageSize ?? 20, total: 0 }
+  return apiRequest<PaginatedResponse<ExecutorLeadView>>(
+    `/api/v1/admin/executor-leads${qs({
+      page: params?.page ?? 1,
+      page_size: params?.pageSize ?? 20,
+      status: params?.status,
+    })}`
+  )
 }
 
 export async function getAdminExecutorLead(id: string): Promise<ExecutorLeadView> {

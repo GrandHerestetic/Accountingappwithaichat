@@ -16,6 +16,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { MessageCircle, CheckCircle, Calendar } from "lucide-react"
+import Link from "next/link"
 import { toast } from "sonner"
 import { listClientOrderResponses, selectClientResponse } from "@/lib/api"
 import type { OrderResponse, ResponseStatus, PaginatedResponse } from "@/lib/api/types"
@@ -185,10 +186,19 @@ export default function OrderResponses({ params }: { params: { id: string } }) {
                       </AlertDialogContent>
                     </AlertDialog>
 
-                    <Button variant="outline" className="w-full">
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      Написать
-                    </Button>
+                    {response.status === "accepted" ? (
+                      <Button variant="outline" className="w-full" asChild>
+                        <Link href={`/chat/${orderId}`}>
+                          <MessageCircle className="w-4 h-4 mr-2" />
+                          Написать
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" className="w-full" disabled title="Чат доступен после выбора исполнителя">
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        Написать
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>

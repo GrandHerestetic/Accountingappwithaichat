@@ -27,6 +27,7 @@ import {
   updateMyResponse,
 } from "@/lib/api"
 import type { OrderResponse, ResponseStatus, PaginatedResponse } from "@/lib/api/types"
+import { redirectToCheckout } from "@/lib/payment"
 
 // ─── Req 4.8: distinct badge colors per response status ─────────────────────
 const RESPONSE_STATUS_COLORS: Record<ResponseStatus, string> = {
@@ -166,11 +167,11 @@ export default function ExecutorResponsesPage() {
     try {
       const result = await submitMyResponse(response.order_id, response.id)
       if (result?.checkout_url) {
-        window.open(result.checkout_url, "_blank")
-      } else {
-        toast.success("Отклик отправлен на оплату!")
-        await fetchResponses()
+        redirectToCheckout(result.checkout_url, "/executor/responses")
+        return
       }
+      toast.success("Отклик отправлен на оплату!")
+      await fetchResponses()
     } catch (err: unknown) {
       // Req 4.9: error toast on API failure
       const message = err instanceof Error ? err.message : "Не удалось отправить отклик на оплату"

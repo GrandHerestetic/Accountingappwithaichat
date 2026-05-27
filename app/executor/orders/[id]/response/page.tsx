@@ -24,6 +24,7 @@ import { toast } from "sonner"
 import { getOrder, listMyOrderResponses, saveOrderResponseDraft, submitMyResponse, uploadAndAttach } from "@/lib/api"
 import type { Order, OrderResponse } from "@/lib/api/types"
 import { ApiError } from "@/lib/api/types"
+import { redirectToCheckout } from "@/lib/payment"
 
 const DEADLINE_MARKER = "\n\nПредлагаемый срок: "
 
@@ -186,7 +187,8 @@ export default function ResponseToOrderPage({ params }: { params: { id: string }
       const submitResult = await submitMyResponse(params.id, savedResponse.id)
 
       if (submitResult.checkout_url) {
-        window.open(submitResult.checkout_url, "_blank")
+        redirectToCheckout(submitResult.checkout_url, "/executor/responses")
+        return
       }
 
       toast.success("Отклик успешно отправлен!")
