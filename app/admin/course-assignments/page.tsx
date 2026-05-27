@@ -21,6 +21,7 @@ import {
   ASSIGNMENT_SOURCE_LABELS,
   ASSIGNMENT_STATUS_COLORS,
   ASSIGNMENT_STATUS_LABELS,
+  isCoursePubliclyAvailable,
 } from "@/lib/course-utils"
 import { toast } from "sonner"
 
@@ -42,7 +43,7 @@ export default function AdminCourseAssignmentsPage() {
         listCourses({ page: 1, pageSize: 100, status: "published" }),
         listAdminCourseAssignments({ page: 1, pageSize: 50 }),
       ])
-      setCourses(coursesData.items)
+      setCourses(coursesData.items.filter(isCoursePubliclyAvailable))
       setAssignments(assignmentsData.items)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Не удалось загрузить данные")

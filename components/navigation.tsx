@@ -66,7 +66,7 @@ export function Navigation() {
 
     // Executor routes
     if (path === "/executor/dashboard" && pathname === "/executor/dashboard") return true
-    if (path === "/executor/orders" && pathname === "/executor/orders") return true
+    if (path === "/executor/orders" && pathname.startsWith("/executor/orders")) return true
 
     // Coach routes
     if (path === "/coach/dashboard" && pathname === "/coach/dashboard") return true
@@ -81,6 +81,7 @@ export function Navigation() {
     if (path === "/admin/disputes" && pathname === "/admin/disputes") return true
     if (path === "/admin/analytics" && pathname === "/admin/analytics") return true
     if (path === "/admin/course-assignments" && pathname === "/admin/course-assignments") return true
+    if (path === "/admin/courses" && pathname.startsWith("/admin/courses")) return true
 
     return false
   }
@@ -161,7 +162,7 @@ export function Navigation() {
         ]
       case "executor":
         return [
-          ...baseItems,
+          ...baseItems.filter((item) => item.href !== "/orders"),
           {
             href: "/executor/dashboard",
             label: "Dashboard",
@@ -235,6 +236,12 @@ export function Navigation() {
             label: "Назначение курсов",
             icon: BookOpen,
             active: isActive("/admin/course-assignments"),
+          },
+          {
+            href: "/admin/courses",
+            label: "Модерация курсов",
+            icon: BookOpen,
+            active: isActive("/admin/courses"),
           },
         ]
       default:
@@ -339,13 +346,6 @@ export function Navigation() {
                         <Link href="/chat">
                           <MessageCircle className="mr-2 h-4 w-4" />
                           Чат
-                        </Link>
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem asChild>
-                        <Link href="/settings">
-                          <Settings className="mr-2 h-4 w-4" />
-                          Настройки
                         </Link>
                       </DropdownMenuItem>
 

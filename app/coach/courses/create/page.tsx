@@ -16,8 +16,7 @@ import {
   createCoachCourse,
   createCoachCourseMaterial,
   publishCoachCourse,
-  updateCoachCourseMaterial,
-  uploadCoachCourseMaterial,
+  uploadFile,
 } from "@/lib/api"
 
 type MaterialDraft = {
@@ -96,23 +95,26 @@ export default function CreateCoursePage() {
   const saveMaterials = async (courseId: string, items: MaterialDraft[]) => {
     for (let i = 0; i < items.length; i++) {
       const material = items[i]
-      const created = await createCoachCourseMaterial(courseId, {
+
+      if (material.type === "pdf" && material.file) {
+        const uploaded = await uploadFile(material.file)
+        await createCoachCourseMaterial(courseId, {
+          title: material.title.trim(),
+          type: material.type,
+          position: i + 1,
+          upload_id: uploaded.id,
+        })
+        continue
+      }
+
+      await createCoachCourseMaterial(courseId, {
         title: material.title.trim(),
         type: material.type,
         position: i + 1,
         ...(material.type === "text"
           ? { content: material.content.trim() }
-          : {
-              url:
-                material.url.trim() ||
-                (material.type === "pdf" && material.file ? "https://pending.upload" : ""),
-            }),
+          : { url: material.url.trim() }),
       })
-
-      if (material.type === "pdf" && material.file) {
-        const uploaded = await uploadCoachCourseMaterial(courseId, created.id, material.file)
-        await updateCoachCourseMaterial(courseId, created.id, { url: uploaded.download_url })
-      }
     }
   }
 
@@ -144,7 +146,7 @@ export default function CreateCoursePage() {
       })
       await saveMaterials(course.id, materials)
       await publishCoachCourse(course.id)
-      toast.success("Курс опубликован")
+      toast.success("Курс отправлен на модерацию. После одобрения администратором он появится в каталоге.")
       router.push("/coach/courses")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Ошибка публикации")
@@ -401,7 +403,7 @@ export default function CreateCoursePage() {
                   onClick={handlePublish}
                   disabled={saving}
                 >
-                  {saving ? "Публикация..." : "Опубликовать курс"}
+                  {saving ? "Отправка..." : "Отправить на модерацию"}
                 </Button>
               </div>
             </CardContent>

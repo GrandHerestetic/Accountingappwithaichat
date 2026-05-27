@@ -12,7 +12,7 @@ import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useCoachCourses } from "@/hooks/use-swr-hooks"
-import { COURSE_STATUS_LABELS, computeCourseStats } from "@/lib/course-utils"
+import { COURSE_STATUS_LABELS, MODERATION_STATUS_COLORS, MODERATION_STATUS_LABELS, computeCourseStats } from "@/lib/course-utils"
 
 export default function CoachCoursesPage() {
   const [activeTab, setActiveTab] = useState("all")
@@ -40,6 +40,15 @@ export default function CoachCoursesPage() {
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     })
   }, [data?.items, activeTab, searchQuery, sortBy])
+
+  const getModerationBadge = (course: (typeof courses)[number]) => {
+    const status = course.moderation_status ?? "draft"
+    return (
+      <Badge className={MODERATION_STATUS_COLORS[status]}>
+        {MODERATION_STATUS_LABELS[status]}
+      </Badge>
+    )
+  }
 
   const getStatusBadge = (status: string) => {
     const label = COURSE_STATUS_LABELS[status as keyof typeof COURSE_STATUS_LABELS] ?? status
@@ -75,7 +84,7 @@ export default function CoachCoursesPage() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
               <Card>
                 <CardContent className="p-6">
                   <p className="text-sm text-gray-600">Всего</p>
@@ -86,6 +95,12 @@ export default function CoachCoursesPage() {
                 <CardContent className="p-6">
                   <p className="text-sm text-gray-600">Опубликовано</p>
                   <p className="text-2xl font-bold">{stats.published}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <p className="text-sm text-gray-600">На модерации</p>
+                  <p className="text-2xl font-bold">{stats.pending}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -163,6 +178,7 @@ export default function CoachCoursesPage() {
                                 <div className="flex items-center gap-3 mb-2 flex-wrap">
                                   <h4 className="text-lg font-semibold">{course.title}</h4>
                                   {getStatusBadge(course.status)}
+                                  {getModerationBadge(course)}
                                 </div>
                                 {course.description && (
                                   <p className="text-gray-600 mb-2 line-clamp-2">{course.description}</p>

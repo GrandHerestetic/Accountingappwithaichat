@@ -5,16 +5,18 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BookOpen, CheckCircle, Clock, Loader2, XCircle } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
+import { BookOpen, CheckCircle, Clock, Loader2, Play, XCircle } from "lucide-react"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
-import { listMyCourseAssignments, markCourseAssignmentCompleted } from "@/lib/api"
+import { listMyCourseAssignments } from "@/lib/api"
 import type { CourseAssignment } from "@/lib/api/types"
 import {
   ASSIGNMENT_SOURCE_LABELS,
   ASSIGNMENT_STATUS_COLORS,
   ASSIGNMENT_STATUS_LABELS,
+  assignmentMaterialsProgress,
   assignmentProgressPercent,
   isAssignmentActive,
 } from "@/lib/course-utils"
@@ -24,7 +26,6 @@ export default function ExecutorCoursesPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [assignments, setAssignments] = useState<CourseAssignment[]>([])
   const [loading, setLoading] = useState(true)
-  const [markingId, setMarkingId] = useState<string | null>(null)
 
   const fetchAssignments = useCallback(async () => {
     setLoading(true)
@@ -51,20 +52,6 @@ export default function ExecutorCoursesPage() {
     return assignments.filter((a) => a.status === statusFilter)
   }, [assignments, statusFilter])
 
-  const handleMarkCompleted = async (assignmentId: string) => {
-    setMarkingId(assignmentId)
-    try {
-      await markCourseAssignmentCompleted(assignmentId)
-      await fetchAssignments()
-      toast.success("Курс отмечен как завершённый")
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Не удалось отметить курс как завершённый"
-      toast.error(message)
-    } finally {
-      setMarkingId(null)
-    }
-  }
-
   return (
     <ProtectedRoute allowedRoles={["executor"]}>
       <div className="min-h-screen bg-gray-50">
@@ -75,7 +62,9 @@ export default function ExecutorCoursesPage() {
             <div className="flex justify-between items-center mb-8">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Мои курсы</h1>
-                <p className="text-gray-600">Курсы для прохождения — назначенные администратором или добавленные вами из каталога</p>
+                <p className="text-gray-600">
+                  Проходите этапы курса по одному — после всех этапов курс завершится автоматически
+                </p>
               </div>
               <Link href="/courses">
                 <Button variant="outline">
@@ -113,6 +102,8 @@ export default function ExecutorCoursesPage() {
                 {filteredAssignments.map((assignment) => {
                   const course = assignment.course
                   const progress = assignmentProgressPercent(assignment)
+                  const { completed, total } = assignmentMaterialsProgress(assignment)
+
                   return (
                     <Card key={assignment.id} className="hover:shadow-md transition-shadow">
                       <CardHeader className="pb-3">
@@ -129,6 +120,19 @@ export default function ExecutorCoursesPage() {
                             {course?.description ? (
                               <p className="text-sm text-gray-600 mb-2 line-clamp-2">{course.description}</p>
                             ) : null}
+
+                            {total > 0 && (
+                              <div className="mb-3 space-y-1">
+                                <div className="flex justify-between text-sm text-gray-600">
+                                  <span>
+                                    Этапы: {completed} / {total}
+                                  </span>
+                                  {progress !== null && <span>{progress}%</span>}
+                                </div>
+                                <Progress value={progress ?? 0} className="h-2" />
+                              </div>
+                            )}
+
                             <p className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                               <span className="flex items-center gap-1">
                                 <Clock className="h-4 w-4" />
@@ -137,9 +141,6 @@ export default function ExecutorCoursesPage() {
                                   "ru-RU"
                                 )}
                               </span>
-                              {progress !== null && (
-                                <span>Прогресс: {progress}%</span>
-                              )}
                               {assignment.status === "completed" && assignment.completed_at && (
                                 <span className="flex items-center gap-1 text-green-600">
                                   <CheckCircle className="h-4 w-4" />
@@ -159,29 +160,38 @@ export default function ExecutorCoursesPage() {
                             </p>
                           </div>
 
-                          <div className="flex gap-2 flex-shrink-0">
-                            <Link href={`/courses/${assignment.course_id}`}>
-                              <Button variant="outline" size="sm">
-                                <BookOpen className="h-4 w-4 mr-1" />
-                                Открыть
+                          <div className="flex flex-col gap-2 shrink-0">
+                          <Link href={`/courses/${assignment.course_id}`}>
+                            <Button
+                              size="sm"
+                              className={
+                                assignment.status === "completed"
+                                  ? ""
+                                  : "bg-blue-600 hover:bg-blue-700"
+                              }
+                              variant={assignment.status === "completed" ? "outline" : "default"}
+                            >
+                              {assignment.status === "completed" ? (
+                                <>
+                                  <BookOpen className="h-4 w-4 mr-1" />
+                                  Открыть
+                                </>
+                              ) : (
+                                <>
+                                  <Play className="h-4 w-4 mr-1" />
+                                  {completed > 0 ? "Продолжить" : "Начать"}
+                                </>
+                              )}
+                            </Button>
+                          </Link>
+                          {assignment.status === "completed" && (
+                            <Link href={`/courses/${assignment.course_id}?tab=review`}>
+                              <Button size="sm" className="w-full bg-green-600 hover:bg-green-700">
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Оставить отзыв
                               </Button>
                             </Link>
-
-                            {isAssignmentActive(assignment.status) && (
-                              <Button
-                                size="sm"
-                                className="bg-green-600 hover:bg-green-700"
-                                disabled={markingId === assignment.id}
-                                onClick={() => handleMarkCompleted(assignment.id)}
-                              >
-                                {markingId === assignment.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                                ) : (
-                                  <CheckCircle className="h-4 w-4 mr-1" />
-                                )}
-                                Завершить
-                              </Button>
-                            )}
+                          )}
                           </div>
                         </div>
                       </CardHeader>

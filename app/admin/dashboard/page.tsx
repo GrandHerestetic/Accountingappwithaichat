@@ -8,7 +8,7 @@ import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/contexts/auth-context"
-import { listAdminCourseAssignments, listAdminSanctions, listOrders } from "@/lib/api"
+import { listAdminCourseAssignments, listAdminCourses, listAdminSanctions, listOrders } from "@/lib/api"
 
 export default function AdminDashboard() {
   const { user } = useAuth()
@@ -17,6 +17,7 @@ export default function AdminDashboard() {
     orders: 0,
     courseAssignments: 0,
     activeSanctions: 0,
+    pendingCourses: 0,
   })
 
   useEffect(() => {
@@ -24,12 +25,14 @@ export default function AdminDashboard() {
       listOrders({ page: 1, pageSize: 1 }),
       listAdminCourseAssignments({ page: 1, pageSize: 1 }),
       listAdminSanctions({ page: 1, pageSize: 50 }),
+      listAdminCourses({ page: 1, pageSize: 1, moderationStatus: "in_review" }),
     ])
-      .then(([orders, assignments, sanctions]) => {
+      .then(([orders, assignments, sanctions, pendingCourses]) => {
         setStats({
           orders: orders.total,
           courseAssignments: assignments.total,
           activeSanctions: sanctions.items.filter((s) => s.status === "active").length,
+          pendingCourses: pendingCourses.total,
         })
       })
       .finally(() => setLoading(false))
@@ -93,6 +96,12 @@ export default function AdminDashboard() {
                     <Button variant="outline" className="w-full justify-start">
                       <Briefcase className="w-4 h-4 mr-2" />
                       Заказы
+                    </Button>
+                  </Link>
+                  <Link href="/admin/courses">
+                    <Button variant="outline" className="w-full justify-start">
+                      <BookOpen className="w-4 h-4 mr-2" />
+                      Модерация курсов ({stats.pendingCourses})
                     </Button>
                   </Link>
                   <Link href="/admin/course-assignments">

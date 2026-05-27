@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Loader2, UserPlus, CheckCircle } from "lucide-react"
 import { enrollInCourse } from "@/lib/api"
 import { toast } from "sonner"
-import { isAssignmentActive } from "@/lib/course-utils"
+import { isEnrolledInCourse } from "@/lib/course-utils"
 import type { CourseAssignment } from "@/lib/api/types"
 
 interface CourseEnrollButtonProps {
@@ -29,20 +29,28 @@ export function CourseEnrollButton({
   const [loading, setLoading] = useState(false)
   const [localAssignment, setLocalAssignment] = useState<CourseAssignment | null>(assignment ?? null)
 
-  const activeAssignment =
-    localAssignment && isAssignmentActive(localAssignment.status) ? localAssignment : null
+  useEffect(() => {
+    setLocalAssignment(assignment ?? null)
+  }, [assignment])
+
+  const enrolled = isEnrolledInCourse(localAssignment)
 
   const handleEnroll = async () => {
+    if (enrolled || loading) return
+
     setLoading(true)
     try {
-      const created = await enrollInCourse(courseId)
-      setLocalAssignment(created)
-      onEnrolled?.(created)
+      const result = await enrollInCourse(courseId)
+      setLocalAssignment(result)
+      onEnrolled?.(result)
       toast.success("Вы записаны на курс")
     } catch (err) {
       const message = err instanceof Error ? err.message : "Не удалось записаться на курс"
       if (message.toLowerCase().includes("conflict") || message.includes("409")) {
         toast.info("Вы уже записаны на этот курс")
+        if (localAssignment) {
+          onEnrolled?.(localAssignment)
+        }
       } else {
         toast.error(message)
       }
@@ -51,7 +59,7 @@ export function CourseEnrollButton({
     }
   }
 
-  if (activeAssignment) {
+  if (enrolled) {
     return (
       <Button asChild variant="outline" size={size} className={className}>
         <Link href="/executor/courses">

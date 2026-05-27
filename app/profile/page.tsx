@@ -54,6 +54,11 @@ import {
   validateUrl,
 } from "@/lib/form-errors"
 import { toast } from "sonner"
+import {
+  getProfileSpecializationsForDisplay,
+  getProfileTitle,
+  parseProfileSpecializations,
+} from "@/lib/profile-display"
 
 type ProfileField = "name" | "phone" | "website"
 
@@ -82,25 +87,28 @@ export default function ProfilePage() {
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string>("")
 
   const applyProfileFromApi = (p: Record<string, unknown>) => {
+    const rawSpecs = parseProfileSpecializations(p.specializations)
+    const displaySpecs = rawSpecs.length > 0 ? rawSpecs : getProfileSpecializationsForDisplay(p, user?.role)
     setEditedProfile({
       name: String(p.profile_name ?? p.display_name ?? p.contact_name ?? p.company_name ?? ""),
-      title: String(p.experience_level ?? p.expertise ?? ""),
+      title: getProfileTitle(p) || String(p.experience_level ?? p.expertise ?? ""),
       location: String(p.city ?? p.address ?? ""),
       bio: String(p.about ?? p.bio ?? ""),
       email: user?.email ?? "",
       phone: String(p.phone ?? ""),
       website: String(p.website ?? ""),
     })
-    const specs = Array.isArray(p.specializations)
-      ? (p.specializations as unknown[]).map(String).filter(Boolean)
-      : []
-    setSpecializations(specs)
-    setSpecializationsText(specs.join(", "))
+    setSpecializations(displaySpecs)
+    setSpecializationsText(displaySpecs.join(", "))
   }
 
   const profile = {
     name: editedProfile.name || user?.profile?.profile_name || user?.email || "",
-    title: editedProfile.title || "Специалист",
+    title:
+      editedProfile.title ||
+      specializations[0] ||
+      getProfileTitle((user?.profile as Record<string, unknown> | undefined) ?? {}) ||
+      "Специалист",
     location: editedProfile.location || "",
     rating: rating || 0,
     reviewsCount: reviews.length,
@@ -206,6 +214,8 @@ export default function ProfilePage() {
     if (Object.values(nextErrors).some(Boolean)) return
 
     try {
+      const specsText = specializationsText.trim() || editedProfile.title.trim()
+      const primarySpec = specsText.split(/[,;]+/)[0]?.trim() || undefined
       const updated = await updateProfile(
         {
           profile_name: editedProfile.name.trim(),
@@ -214,8 +224,14 @@ export default function ProfilePage() {
           bio: editedProfile.bio.trim(),
           location: editedProfile.location.trim(),
           website: editedProfile.website.trim(),
-          experience_level: editedProfile.title.trim() || undefined,
-          specializations_text: specializationsText,
+          ...(user?.role === "coach"
+            ? { expertise: specsText || undefined }
+            : user?.role === "executor"
+              ? {
+                  experience_level: primarySpec,
+                  specializations_text: specsText,
+                }
+              : { experience_level: editedProfile.title.trim() || undefined }),
           ...(user?.role === "client"
             ? {
                 company_name: editedProfile.name.trim(),
@@ -351,16 +367,18 @@ export default function ProfilePage() {
                                   {...fieldAriaProps(profileErrors.name, "edit-name")}
                                 />
                               </FormField>
-                              <FormField label="Специализация" htmlFor="edit-title">
-                                <Input
-                                  id="edit-title"
-                                  value={editedProfile.title}
-                                  onChange={(e) => handleInputChange("title", e.target.value)}
-                                  placeholder="Например: Налоговый учёт"
-                                />
-                              </FormField>
+                              {user?.role !== "executor" && user?.role !== "coach" && (
+                                <FormField label="Специализация" htmlFor="edit-title">
+                                  <Input
+                                    id="edit-title"
+                                    value={editedProfile.title}
+                                    onChange={(e) => handleInputChange("title", e.target.value)}
+                                    placeholder="Например: Налоговый учёт"
+                                  />
+                                </FormField>
+                              )}
                             </div>
-                            {user?.role === "executor" && (
+                            {(user?.role === "executor" || user?.role === "coach") && (
                               <FormField
                                 label="Специализации (через запятую)"
                                 htmlFor="edit-specializations"
@@ -526,13 +544,19 @@ export default function ProfilePage() {
                       <CardTitle>Специализации</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex flex-wrap gap-2">
-                        {profile.specializations.map((spec, index) => (
-                          <Badge key={index} variant="secondary">
-                            {spec}
-                          </Badge>
-                        ))}
-                      </div>
+                      {profile.specializations.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {profile.specializations.map((spec, index) => (
+                            <Badge key={index} variant="secondary">
+                              {spec}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500">
+                          Укажите специализацию в настройках профиля
+                        </p>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>

@@ -40,6 +40,9 @@ function reviewTitle(item: MyReview): string {
   if (item.source === "order" && item.order_id) {
     return `Заказ #${item.order_id.slice(0, 8)}`
   }
+  if (item.target_type === "course" && item.target_id) {
+    return `Курс #${item.target_id.slice(0, 8)}`
+  }
   if (item.target_type && item.target_id) {
     return `${item.target_type} #${item.target_id.slice(0, 8)}`
   }
@@ -49,11 +52,15 @@ function reviewTitle(item: MyReview): string {
 function reviewSubtitle(item: MyReview): string {
   if (item.direction === "client_to_executor") return "Вы оценили исполнителя"
   if (item.direction === "executor_to_client") return "Вы оценили заказчика"
+  if (item.target_type === "course") return "Вы оценили курс"
   if (item.source === "entity") return "Отзыв на платформе"
   return ""
 }
 
 function reviewLink(item: MyReview, role?: string): string | null {
+  if (item.target_type === "course" && item.target_id) {
+    return `/courses/${item.target_id}?tab=review`
+  }
   if (item.source !== "order" || !item.order_id) return null
   if (role === "client") return `/client/order/${item.order_id}`
   if (role === "executor") return `/executor/orders/${item.order_id}/response`

@@ -287,6 +287,9 @@ export interface Course {
   description?: string
   category?: string
   status: "draft" | "published" | "archived"
+  moderation_status?: "draft" | "in_review" | "approved" | "rejected"
+  rating_avg?: number
+  rating_count?: number
   created_at: string
   updated_at: string
 }

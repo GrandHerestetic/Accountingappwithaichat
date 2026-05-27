@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BookOpen, Archive, TrendingUp, Award, Plus, Eye, FileText, BarChart3, Settings } from "lucide-react"
+import { BookOpen, Archive, TrendingUp, Award, Plus, Eye, FileText, BarChart3 } from "lucide-react"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
@@ -61,12 +61,6 @@ export default function CoachDashboard() {
                   <Button className="bg-purple-600 hover:bg-purple-700">
                     <Plus className="w-4 h-4 mr-2" />
                     Создать курс
-                  </Button>
-                </Link>
-                <Link href="/settings">
-                  <Button variant="outline">
-                    <Settings className="w-4 h-4 mr-2" />
-                    Настройки
                   </Button>
                 </Link>
               </div>

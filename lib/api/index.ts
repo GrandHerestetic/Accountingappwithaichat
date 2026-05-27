@@ -267,6 +267,16 @@ export async function deleteMyReview(reviewId: string): Promise<MyReview> {
   return apiRequest<MyReview>(`/api/v1/my/reviews/${reviewId}`, { method: "DELETE" })
 }
 
+export async function getMyCourseReview(courseId: string): Promise<MyReview | null> {
+  const data = await listMyReviews({ page: 1, pageSize: 100 })
+  return (
+    data.items.find(
+      (item) =>
+        item.source === "entity" && item.target_type === "course" && item.target_id === courseId
+    ) ?? null
+  )
+}
+
 // ─── Executor responses ───────────────────────────────────────────────────────
 
 export async function listMyResponses(params?: ListParams): Promise<PaginatedResponse<OrderResponse>> {
@@ -758,9 +768,18 @@ export async function createCoachCourseMaterial(
     position?: number
   }
 ): Promise<CourseMaterial> {
+  const payload: Record<string, unknown> = {
+    title: body.title.trim(),
+    type: body.type,
+  }
+  if (body.position !== undefined) payload.position = body.position
+  if (body.upload_id) payload.upload_id = body.upload_id
+  if (body.content?.trim()) payload.content = body.content.trim()
+  if (body.url?.trim()) payload.url = body.url.trim()
+
   return apiRequest<CourseMaterial>(`/api/v1/coach/courses/${courseId}/materials`, {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   })
 }
 
@@ -791,18 +810,17 @@ export async function deleteCoachCourseMaterial(
   })
 }
 
-/** Multipart upload for PDF materials — POST /coach/courses/:id/materials/:materialId/upload */
+/** Загрузка файла для материала курса через POST /api/v1/files */
 export async function uploadCoachCourseMaterial(
-  courseId: string,
-  materialId: string,
+  _courseId: string,
+  _materialId: string,
   file: File
 ): Promise<StorageUploadResponse> {
-  const formData = new FormData()
-  formData.append("file", file)
-  return apiFormRequest<StorageUploadResponse>(
-    `/api/v1/coach/courses/${courseId}/materials/${materialId}/upload`,
-    formData
-  )
+  const uploaded = await uploadFile(file)
+  return {
+    download_url: uploaded.url,
+    path: uploaded.file_path,
+  }
 }
 
 export async function publishCoachCourse(id: string): Promise<Course> {
@@ -824,6 +842,16 @@ export async function getMyCourseAssignment(id: string): Promise<CourseAssignmen
 
 export async function markCourseAssignmentCompleted(id: string): Promise<void> {
   return apiRequest(`/api/v1/my/course-assignments/${id}/mark-completed`, { method: "POST" })
+}
+
+export async function markCourseMaterialCompleted(
+  assignmentId: string,
+  materialId: string
+): Promise<CourseAssignment> {
+  return apiRequest<CourseAssignment>(
+    `/api/v1/my/course-assignments/${assignmentId}/materials/${materialId}/complete`,
+    { method: "POST" }
+  )
 }
 
 export async function enrollInCourse(courseId: string): Promise<CourseAssignment> {
@@ -938,6 +966,31 @@ export async function createAdminCourseAssignment(
   return apiRequest<CourseAssignment>("/api/v1/admin/course-assignments", {
     method: "POST",
     body: JSON.stringify(body),
+  })
+}
+
+export async function listAdminCourses(
+  params?: ListParams & { status?: string; moderationStatus?: string; q?: string }
+): Promise<PaginatedResponse<Course>> {
+  return apiRequest(
+    `/api/v1/admin/courses${qs({
+      page: params?.page ?? 1,
+      page_size: params?.pageSize ?? 20,
+      status: params?.status,
+      moderation_status: params?.moderationStatus,
+      q: params?.q,
+    })}`
+  )
+}
+
+export async function approveAdminCourse(id: string): Promise<Course> {
+  return apiRequest<Course>(`/api/v1/admin/courses/${id}/approve`, { method: "POST" })
+}
+
+export async function rejectAdminCourse(id: string, reason?: string): Promise<Course> {
+  return apiRequest<Course>(`/api/v1/admin/courses/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify(reason?.trim() ? { reason: reason.trim() } : {}),
   })
 }
 

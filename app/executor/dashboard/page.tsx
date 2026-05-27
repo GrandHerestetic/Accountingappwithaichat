@@ -4,21 +4,15 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Progress } from "@/components/ui/progress"
 import {
   Star,
-  TrendingUp,
   DollarSign,
   Clock,
   CheckCircle,
-  AlertTriangle,
   MessageCircle,
   Eye,
   Calendar,
-  Award,
   Target,
-  Users,
 } from "lucide-react"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
@@ -26,7 +20,6 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/contexts/auth-context"
 import { getExecutorRating, listMyResponses } from "@/lib/api"
 import type { OrderResponse } from "@/lib/api/types"
-import { Loader2 } from "lucide-react"
 
 export default function ExecutorDashboard() {
   const { user } = useAuth()
@@ -166,9 +159,7 @@ export default function ExecutorDashboard() {
             </div>
 
             {/* Main Content */}
-            <div className="grid gap-8 lg:grid-cols-3">
-              {/* Left Column - Orders */}
-              <div className="lg:col-span-2 space-y-6">
+            <div className="space-y-6">
                 <Card>
                   <CardHeader>
                     <CardTitle>Мои заказы</CardTitle>
@@ -226,163 +217,6 @@ export default function ExecutorDashboard() {
                     </div>
                   </CardContent>
                 </Card>
-              </div>
-
-              {/* Right Column - Profile & Stats */}
-              <div className="space-y-6">
-                {/* Profile Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="w-5 h-5" />
-                      Профиль
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="text-center">
-                      <Avatar className="h-20 w-20 mx-auto mb-3">
-                        <AvatarImage src={user?.profile?.avatar_url || "/placeholder.svg?height=80&width=80"} />
-                        <AvatarFallback>
-                          {(user?.profile?.profile_name ?? user?.email ?? "U")
-                            .split(" ")
-                            .map((n: string) => n[0])
-                            .join("")
-                            .slice(0, 2)
-                            .toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <h3 className="font-semibold">{user?.profile?.profile_name ?? user?.email}</h3>
-                      <p className="text-sm text-gray-600">Бухгалтер-консультант</p>
-                      <div className="flex items-center justify-center gap-1 mt-2">
-                        <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                        <span className="font-medium">{stats.rating}</span>
-                        <span className="text-sm text-gray-500">({stats.completedOrders} отзывов)</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Откликов всего</span>
-                        <span className="font-medium">"—"</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Активных откликов</span>
-                        <span className="font-medium">{stats.activeOrders}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Успешность заказов</span>
-                        <span className="font-medium">95%</span>
-                      </div>
-                    </div>
-
-                    <Link href="/profile">
-                      <Button className="w-full" variant="outline">
-                        Редактировать профиль
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-
-                {/* Performance Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5" />
-                      Производительность
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <div className="flex justify-between mb-2">
-                        <span className="text-sm">Заполненность профиля</span>
-                        <span className="text-sm font-medium">85%</span>
-                      </div>
-                      <Progress value={85} />
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between mb-2">
-                        <span className="text-sm">Активность</span>
-                        <span className="text-sm font-medium">92%</span>
-                      </div>
-                      <Progress value={92} />
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between mb-2">
-                        <span className="text-sm">Качество работы</span>
-                        <span className="text-sm font-medium">96%</span>
-                      </div>
-                      <Progress value={96} />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Achievements Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Award className="w-5 h-5" />
-                      Достижения
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-yellow-100 rounded-full">
-                          <Star className="w-4 h-4 text-yellow-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">Топ исполнитель</p>
-                          <p className="text-xs text-gray-600">Рейтинг выше 4.5</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-green-100 rounded-full">
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">Надежный партнер</p>
-                          <p className="text-xs text-gray-600">10+ успешных заказов</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 rounded-full">
-                          <Clock className="w-4 h-4 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">Быстрый отклик</p>
-                          <p className="text-xs text-gray-600">Ответ в течение часа</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Warning Card (if rating is low) */}
-                {stats.rating < 3.0 && (
-                  <Card className="border-red-200 bg-red-50">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-red-800">
-                        <AlertTriangle className="w-5 h-5" />
-                        Внимание!
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-red-700 mb-3">
-                        Ваш рейтинг критически низкий. Необходимо улучшить качество работы.
-                      </p>
-                      <Link href="/executor/rating-warning">
-                        <Button size="sm" className="bg-red-600 hover:bg-red-700">
-                          Подробнее
-                        </Button>
-                      </Link>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
             </div>
           </div>
         </main>

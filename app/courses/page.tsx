@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { listCourses, listMyCourseAssignments } from "@/lib/api"
 import type { Course, CourseAssignment, PaginatedResponse } from "@/lib/api/types"
 import { toast } from "sonner"
-import { COURSE_STATUS_LABELS, isAssignmentActive } from "@/lib/course-utils"
+import { COURSE_STATUS_LABELS, isEnrolledInCourse } from "@/lib/course-utils"
 import { CourseEnrollButton } from "@/components/courses/course-enroll-button"
 
 export default function CoursesPage() {
@@ -53,7 +53,9 @@ export default function CoursesPage() {
         setCourses(coursesData.items)
         const map = new Map<string, CourseAssignment>()
         for (const item of assignmentsData.items) {
-          if (isAssignmentActive(item.status)) {
+          if (!isEnrolledInCourse(item)) continue
+          const prev = map.get(item.course_id)
+          if (!prev || new Date(item.created_at) > new Date(prev.created_at)) {
             map.set(item.course_id, item)
           }
         }
