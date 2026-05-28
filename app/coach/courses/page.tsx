@@ -7,18 +7,20 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BookOpen, Plus, Search, Eye, Loader2 } from "lucide-react"
+import { BookOpen, Plus, Search, Eye, Loader2, Pencil, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useCoachCourses } from "@/hooks/use-swr-hooks"
+import { archiveCoachCourse, deleteCoachCourse } from "@/lib/api"
 import { COURSE_STATUS_LABELS, MODERATION_STATUS_COLORS, MODERATION_STATUS_LABELS, computeCourseStats } from "@/lib/course-utils"
+import { toast } from "sonner"
 
 export default function CoachCoursesPage() {
   const [activeTab, setActiveTab] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState("newest")
-  const { data, isLoading } = useCoachCourses({ page: 1, pageSize: 100 })
+  const { data, isLoading, mutate } = useCoachCourses({ page: 1, pageSize: 100 })
 
   const stats = useMemo(() => computeCourseStats(data?.items ?? []), [data?.items])
 
@@ -48,6 +50,29 @@ export default function CoachCoursesPage() {
         {MODERATION_STATUS_LABELS[status]}
       </Badge>
     )
+  }
+
+  const handleRemoveCourse = async (course: (typeof courses)[number]) => {
+    const isPublished = course.status === "published"
+    const confirmed = confirm(
+      isPublished
+        ? `Отправить курс «${course.title}» в архив?`
+        : `Удалить курс «${course.title}»? Это действие нельзя отменить.`
+    )
+    if (!confirmed) return
+
+    try {
+      if (isPublished) {
+        await archiveCoachCourse(course.id)
+        toast.success("Курс отправлен в архив")
+      } else {
+        await deleteCoachCourse(course.id)
+        toast.success("Курс удалён")
+      }
+      await mutate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось выполнить действие")
+    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -187,12 +212,31 @@ export default function CoachCoursesPage() {
                                   Обновлён {new Date(course.updated_at).toLocaleDateString("ru-RU")}
                                 </p>
                               </div>
-                              <Link href={`/courses/${course.id}`}>
-                                <Button size="sm" variant="outline">
-                                  <Eye className="w-4 h-4 mr-1" />
-                                  Просмотр
-                                </Button>
-                              </Link>
+                              <div className="flex flex-col gap-2 shrink-0">
+                                <Link href={`/coach/courses/${course.id}/edit`}>
+                                  <Button size="sm" className="w-full bg-purple-600 hover:bg-purple-700">
+                                    <Pencil className="w-4 h-4 mr-1" />
+                                    Редактировать
+                                  </Button>
+                                </Link>
+                                <Link href={`/courses/${course.id}`}>
+                                  <Button size="sm" variant="outline" className="w-full">
+                                    <Eye className="w-4 h-4 mr-1" />
+                                    Просмотр
+                                  </Button>
+                                </Link>
+                                {course.status !== "archived" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="w-full text-red-600 hover:text-red-700"
+                                    onClick={() => void handleRemoveCourse(course)}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-1" />
+                                    {course.status === "published" ? "В архив" : "Удалить"}
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           </CardContent>
                         </Card>

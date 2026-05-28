@@ -232,8 +232,9 @@ export async function reopenClientOrder(orderId: string): Promise<void> {
 export async function getClientOrderReview(orderId: string): Promise<Review | null> {
   try {
     return await apiRequest<Review>(`/api/v1/client/orders/${orderId}/review`)
-  } catch {
-    return null
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null
+    throw err
   }
 }
 
@@ -755,6 +756,10 @@ export async function updateCoachCourse(id: string, body: UpdateCourseRequest): 
 
 export async function archiveCoachCourse(id: string): Promise<Course> {
   return apiRequest<Course>(`/api/v1/coach/courses/${id}/archive`, { method: "POST" })
+}
+
+export async function deleteCoachCourse(id: string): Promise<void> {
+  return apiRequest(`/api/v1/coach/courses/${id}`, { method: "DELETE" })
 }
 
 export async function createCoachCourseMaterial(

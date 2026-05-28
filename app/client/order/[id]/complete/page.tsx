@@ -32,10 +32,11 @@ import {
   createClientOrderReview,
   deleteMyReview,
   getClientOrderReview,
+  getMyOrderDetails,
   reopenClientOrder,
   updateMyReview,
 } from "@/lib/api"
-import type { Review, ApiError } from "@/lib/api/types"
+import type { Order, Review, ApiError } from "@/lib/api/types"
 import { toast } from "sonner"
 
 export default function CompleteOrderPage({ params }: { params: { id: string } }) {
@@ -43,6 +44,8 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
   const orderId = params.id
 
   // Complete-order state
+  const [order, setOrder] = useState<Order | null>(null)
+  const [isLoadingOrder, setIsLoadingOrder] = useState(true)
   const [isCompleting, setIsCompleting] = useState(false)
   const [orderCompleted, setOrderCompleted] = useState(false)
   const [reopening, setReopening] = useState(false)
@@ -54,12 +57,19 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
   const [existingReview, setExistingReview] = useState<Review | null>(null)
   const [isLoadingReview, setIsLoadingReview] = useState(true)
 
-  // Load existing review on mount
+  // Load order and existing review on mount
   useEffect(() => {
-    const fetchReview = async () => {
+    const fetchData = async () => {
+      setIsLoadingOrder(true)
       setIsLoadingReview(true)
       try {
-        const review = await getClientOrderReview(orderId)
+        const [orderData, review] = await Promise.all([
+          getMyOrderDetails(orderId),
+          getClientOrderReview(orderId),
+        ])
+        setOrder(orderData.order)
+        const completed = orderData.order.status === "completed"
+        setOrderCompleted(completed)
         if (review) {
           setExistingReview(review)
           setRating(review.rating)
@@ -68,13 +78,14 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
           setExistingReview(null)
         }
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Не удалось загрузить отзыв")
+        toast.error(err instanceof Error ? err.message : "Не удалось загрузить данные заказа")
       } finally {
+        setIsLoadingOrder(false)
         setIsLoadingReview(false)
       }
     }
 
-    fetchReview()
+    void fetchData()
   }, [orderId])
 
   // Complete order handler (called after AlertDialog confirmation)
@@ -84,6 +95,7 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
       await completeClientOrder(orderId)
       toast.success("Заказ успешно завершён! Теперь вы можете оставить отзыв.")
       setOrderCompleted(true)
+      setOrder((prev) => (prev ? { ...prev, status: "completed" } : prev))
     } catch (err) {
       const apiErr = err as ApiError
       toast.error(apiErr.message ?? "Не удалось завершить заказ")
@@ -100,6 +112,7 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
       await reopenClientOrder(orderId)
       toast.success("Заказ снова в работе")
       setOrderCompleted(false)
+      setOrder((prev) => (prev ? { ...prev, status: "in_progress" } : prev))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Не удалось переоткрыть заказ")
     } finally {
@@ -108,6 +121,10 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
   }
 
   const handleSubmitReview = async () => {
+    if (!orderCompleted && order?.status !== "completed") {
+      toast.error("Сначала завершите заказ, затем оставьте отзыв")
+      return
+    }
     if (rating === 0) {
       toast.error("Пожалуйста, поставьте оценку исполнителю")
       return
@@ -129,6 +146,20 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
       router.push(`/client/order/${orderId}`)
     } catch (err) {
       const apiErr = err as ApiError
+      if (apiErr.status === 409 && apiErr.code === "already_exists") {
+        const review = await getClientOrderReview(orderId)
+        if (review?.id) {
+          setExistingReview(review)
+          await updateMyReview(review.id, { rating, comment: comment.trim() })
+          toast.success("Отзыв обновлён")
+          router.push(`/client/order/${orderId}`)
+          return
+        }
+      }
+      if (apiErr.status === 409 && apiErr.code === "invalid_state") {
+        toast.error("Сначала завершите заказ, затем оставьте отзыв")
+        return
+      }
       toast.error(apiErr.message ?? "Не удалось сохранить отзыв")
     } finally {
       setIsSubmittingReview(false)
@@ -161,6 +192,7 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
   }
 
   const isEditing = existingReview !== null
+  const canLeaveReview = orderCompleted || order?.status === "completed"
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -186,7 +218,12 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {orderCompleted ? (
+                {isLoadingOrder ? (
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Загрузка статуса заказа...</span>
+                  </div>
+                ) : orderCompleted || order?.status === "completed" ? (
                   <div className="space-y-3">
                     <div className="flex items-center gap-3 text-green-700 bg-green-50 border border-green-200 rounded-lg p-4">
                       <CheckCircle className="w-5 h-5 flex-shrink-0" />
@@ -202,7 +239,7 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
                       <Button
                         className="bg-green-600 hover:bg-green-700"
                         size="lg"
-                        disabled={isCompleting}
+                        disabled={isCompleting || order?.status !== "in_progress"}
                       >
                         {isCompleting ? (
                           <>
@@ -256,6 +293,10 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
                   <div className="flex items-center gap-2 text-gray-500">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span>Загрузка...</span>
+                  </div>
+                ) : !canLeaveReview ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    Отзыв можно оставить только после завершения заказа. Нажмите «Завершить заказ» выше.
                   </div>
                 ) : (
                   <>
@@ -322,7 +363,7 @@ export default function CompleteOrderPage({ params }: { params: { id: string } }
                         onClick={handleSubmitReview}
                         className="flex-1 bg-blue-600 hover:bg-blue-700"
                         size="lg"
-                        disabled={isSubmittingReview || rating === 0 || !comment.trim()}
+                        disabled={isSubmittingReview || !canLeaveReview || rating === 0 || !comment.trim()}
                       >
                         {isSubmittingReview ? (
                           <>

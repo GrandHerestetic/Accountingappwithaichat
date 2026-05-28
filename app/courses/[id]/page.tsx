@@ -21,6 +21,7 @@ import {
 import { useAuth } from "@/contexts/auth-context"
 import { CourseEnrollButton } from "@/components/courses/course-enroll-button"
 import { CourseMaterialsProgress } from "@/components/courses/course-materials-progress"
+import { CourseMaterialsView } from "@/components/courses/course-materials-view"
 import { CourseReviewForm } from "@/components/courses/course-review-form"
 
 export default function CourseDetailPage() {
@@ -29,6 +30,7 @@ export default function CourseDetailPage() {
   const courseId = params.id as string
   const { user } = useAuth()
   const isExecutor = user?.role === "executor"
+  const isAdmin = user?.role === "admin"
 
   const [course, setCourse] = useState<Course | null>(null)
   const [materials, setMaterials] = useState<CourseMaterial[]>([])
@@ -57,7 +59,7 @@ export default function CourseDetailPage() {
           (item) => item.course_id === courseId && isEnrolledInCourse(item)
         )
         setAssignment(active ?? null)
-        if (active && detail.materials?.length) {
+        if ((isAdmin || active) && detail.materials?.length) {
           setActiveTab("materials")
         }
       } catch (err) {
@@ -68,7 +70,7 @@ export default function CourseDetailPage() {
       }
     }
     fetchCourse()
-  }, [courseId, isExecutor])
+  }, [courseId, isExecutor, isAdmin])
 
   useEffect(() => {
     if (searchParams.get("tab") === "review" && canReview) {
@@ -127,11 +129,11 @@ export default function CourseDetailPage() {
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
         <div className="container mx-auto px-4 py-12">
           <Link
-            href={isExecutor ? "/executor/courses" : "/courses"}
+            href={isExecutor ? "/executor/courses" : isAdmin ? "/admin/courses" : "/courses"}
             className="inline-flex items-center gap-2 text-blue-200 hover:text-white mb-6 text-sm"
           >
             <ArrowLeft className="h-4 w-4" />
-            {isExecutor ? "Назад к моим курсам" : "Назад к курсам"}
+            {isExecutor ? "Назад к моим курсам" : isAdmin ? "Назад к модерации" : "Назад к курсам"}
           </Link>
 
           <div className="space-y-4 max-w-3xl">
@@ -220,7 +222,7 @@ export default function CourseDetailPage() {
                   <p className="text-gray-600">Материалы курса пока недоступны</p>
                 </CardContent>
               </Card>
-            ) : !assignment ? (
+            ) : !assignment && !isAdmin ? (
               <Card>
                 <CardContent className="py-12 text-center space-y-4">
                   <p className="text-gray-600">
@@ -237,12 +239,17 @@ export default function CourseDetailPage() {
                   )}
                 </CardContent>
               </Card>
-            ) : (
+            ) : assignment ? (
               <CourseMaterialsProgress
                 assignment={assignment}
                 materials={materials}
                 onAssignmentUpdate={setAssignment}
                 onCourseCompleted={() => setActiveTab("review")}
+              />
+            ) : (
+              <CourseMaterialsView
+                materials={materials}
+                hint="Просмотр материалов для модерации — запись на курс не требуется"
               />
             )}
           </TabsContent>
