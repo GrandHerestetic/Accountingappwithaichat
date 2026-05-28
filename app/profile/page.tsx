@@ -33,6 +33,7 @@ import { AdminProfilePanel } from "@/components/profile/admin-profile-panel"
 import { useAuth } from "@/contexts/auth-context"
 import { getExecutorRating, getExecutorReviews, getProfile, updateProfile, uploadProfileAvatar } from "@/lib/api"
 import { FileUploadField } from "@/components/file-upload-field"
+import { ChangePasswordSection } from "@/components/profile/change-password-section"
 import { ProfileAchievementsTab } from "@/components/profile/profile-achievements-tab"
 import { ProfilePortfolioTab } from "@/components/profile/profile-portfolio-tab"
 import { MyReviewsPanel } from "@/components/reviews/my-reviews-panel"
@@ -434,6 +435,8 @@ export default function ProfilePage() {
                               </FormField>
                             </div>
                           </div>
+
+                          <ChangePasswordSection />
 
                           {/* Кнопки действий */}
                           <div className="flex gap-3 pt-4 border-t">

@@ -13,12 +13,24 @@ import {
   MessageCircle,
   Eye,
   Clock,
+  Flag,
 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import useSWR from "swr"
 import { Navigation } from "@/components/navigation"
-import { listMyResponses } from "@/lib/api"
+import { listAllMyResponses, reportOrderAsExecutor } from "@/lib/api"
+import { toast } from "sonner"
 import { useOrders } from "@/hooks/use-swr-hooks"
 import { useAuth } from "@/contexts/auth-context"
 import type { Order, ResponseStatus } from "@/lib/api/types"
@@ -38,6 +50,10 @@ export default function ExecutorOrders() {
   const [selectedCategory, setSelectedCategory] = useState("")
   const [selectedLocation, setSelectedLocation] = useState("")
   const [sortBy, setSortBy] = useState("newest")
+  const [reportOrder, setReportOrder] = useState<Order | null>(null)
+  const [reportReason, setReportReason] = useState("")
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportError, setReportError] = useState<string | null>(null)
 
   const { user } = useAuth()
   const { data, isLoading, error } = useOrders({
@@ -46,21 +62,21 @@ export default function ExecutorOrders() {
     q: searchQuery || undefined,
     category: selectedCategory && selectedCategory !== "Все категории" ? selectedCategory : undefined,
   })
-  const { data: myResponsesData } = useSWR(
+  const { data: myResponseItems } = useSWR(
     user?.role === "executor" ? ["my-responses", "job-search"] : null,
-    () => listMyResponses({ page: 1, pageSize: 200 })
+    listAllMyResponses
   )
   const orders: Order[] = data?.items ?? []
 
   const respondedOrderIds = useMemo(() => {
     const ids = new Set<string>()
-    for (const r of myResponsesData?.items ?? []) {
+    for (const r of myResponseItems ?? []) {
       if (ACTIVE_RESPONSE_STATUSES.includes(r.status)) {
         ids.add(r.order_id)
       }
     }
     return ids
-  }, [myResponsesData])
+  }, [myResponseItems])
 
   const categories = [
     "Все категории",
@@ -96,6 +112,35 @@ export default function ExecutorOrders() {
 
   const handleResponseClick = (orderId: string) => {
     router.push(`/executor/orders/${orderId}/response`)
+  }
+
+  const openReportDialog = (order: Order) => {
+    setReportOrder(order)
+    setReportReason("")
+    setReportError(null)
+  }
+
+  const handleReportSubmit = async () => {
+    if (!reportOrder) return
+    const reason = reportReason.trim()
+    if (reason.length < 10) {
+      const msg = "Опишите причину жалобы (минимум 10 символов)"
+      setReportError(msg)
+      toast.error(msg)
+      return
+    }
+    setReportError(null)
+    setReportLoading(true)
+    try {
+      const result = await reportOrderAsExecutor(reportOrder.id, reason)
+      toast.success(result.message || "Жалоба отправлена администратору")
+      setReportOrder(null)
+      setReportReason("")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Не удалось отправить жалобу")
+    } finally {
+      setReportLoading(false)
+    }
   }
 
   return (
@@ -170,10 +215,10 @@ export default function ExecutorOrders() {
           </Card>
 
           {/* Results Summary */}
-          <div className="flex justify-between items-center mb-6">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-gray-600">Найдено {filteredOrders.length} заказов</p>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -193,11 +238,11 @@ export default function ExecutorOrders() {
           <div className="space-y-6">
             {filteredOrders.map((order) => (
               <Card key={order.id} className="hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-start gap-4">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-xl font-semibold mb-2">{order.title}</h3>
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
+                      <h3 className="mb-2 text-lg font-semibold sm:text-xl">{order.title}</h3>
+                      <div className="mb-3 flex flex-wrap items-center gap-3 text-sm text-gray-600 sm:gap-4">
                         <span className="flex items-center gap-1">
                           <DollarSign className="w-4 h-4" />
                           {order.budget_amount.toLocaleString("ru-RU")} {order.currency ?? "₸"}
@@ -213,11 +258,11 @@ export default function ExecutorOrders() {
                           {order.category_name ?? order.category_slug}
                         </Badge>
                       )}
-                      <p className="text-gray-700 leading-relaxed">{order.description}</p>
+                      <p className="text-gray-700 leading-relaxed break-words">{order.description}</p>
                     </div>
-                    <div className="shrink-0 space-y-2">
+                    <div className="grid w-full shrink-0 grid-cols-2 gap-2 sm:w-56 sm:grid-cols-1">
                       <Button
-                        className="w-full bg-green-600 hover:bg-green-700"
+                        className="col-span-2 w-full bg-green-600 hover:bg-green-700 sm:col-span-1"
                         onClick={() => handleResponseClick(order.id)}
                       >
                         <MessageCircle className="w-4 h-4 mr-2" />
@@ -229,6 +274,14 @@ export default function ExecutorOrders() {
                           Чат
                         </Button>
                       </Link>
+                      <Button
+                        variant="outline"
+                        className="w-full border-amber-200 text-amber-800 hover:bg-amber-50"
+                        onClick={() => openReportDialog(order)}
+                      >
+                        <Flag className="w-4 h-4 mr-2" />
+                        Пожаловаться
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -259,7 +312,7 @@ export default function ExecutorOrders() {
           {/* Info Card */}
           <Card className="mt-8 bg-green-50 border-green-200">
             <CardContent className="p-6">
-              <h3 className="font-semibold text-green-900 mb-3">💡 Советы для успешных откликов:</h3>
+              <h3 className="font-semibold text-green-900 mb-3">Советы для успешных откликов:</h3>
               <ul className="space-y-2 text-sm text-green-800">
                 <li>• Внимательно читайте описание заказа и требования</li>
                 <li>• Указывайте конкретные сроки и стоимость в своем предложении</li>
@@ -271,6 +324,80 @@ export default function ExecutorOrders() {
           </Card>
         </div>
       </main>
+
+      <Dialog
+        open={!!reportOrder}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReportOrder(null)
+            setReportReason("")
+            setReportError(null)
+          }
+        }}
+      >
+        <DialogContent>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              void handleReportSubmit()
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Пожаловаться на заказ</DialogTitle>
+              <DialogDescription>
+                {reportOrder && (
+                  <>
+                    «{reportOrder.title}» — жалоба уйдёт администратору в раздел «Управление
+                    заказами».
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-4">
+              <Label htmlFor="report-reason">Причина *</Label>
+              <Textarea
+                id="report-reason"
+                rows={4}
+                placeholder="Опишите, что не так с заказом (спам, мошенничество, некорректное описание…)"
+                value={reportReason}
+                onChange={(e) => {
+                  setReportReason(e.target.value)
+                  if (reportError) setReportError(null)
+                }}
+                aria-invalid={!!reportError}
+              />
+              {reportError && (
+                <p className="text-sm text-destructive" role="alert">
+                  {reportError}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Минимум 10 символов ({reportReason.trim().length}/10)
+              </p>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setReportOrder(null)
+                  setReportReason("")
+                  setReportError(null)
+                }}
+              >
+                Отмена
+              </Button>
+              <Button
+                type="submit"
+                className="bg-amber-600 hover:bg-amber-700"
+                disabled={reportLoading}
+              >
+                {reportLoading ? "Отправка…" : "Отправить жалобу"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

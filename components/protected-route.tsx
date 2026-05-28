@@ -2,12 +2,13 @@
 
 import type React from "react"
 import { useAuth } from "@/contexts/auth-context"
+import { userHasAllowedRole, type AppRole } from "@/lib/user-roles"
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 
 interface ProtectedRouteProps {
   children: React.ReactNode
-  allowedRoles: Array<"client" | "executor" | "coach" | "admin">
+  allowedRoles: AppRole[]
   redirectTo?: string
 }
 
@@ -23,7 +24,7 @@ export function ProtectedRoute({ children, allowedRoles, redirectTo = "/auth/log
       return
     }
 
-    if (user && !allowedRoles.includes(user.role)) {
+    if (user && !userHasAllowedRole(user, allowedRoles)) {
       router.push("/auth/login")
     }
   }, [isAuthenticated, user, allowedRoles, router, redirectTo, isLoading])
@@ -44,7 +45,7 @@ export function ProtectedRoute({ children, allowedRoles, redirectTo = "/auth/log
     return null
   }
 
-  if (user && !allowedRoles.includes(user.role)) {
+  if (user && !userHasAllowedRole(user, allowedRoles)) {
     return null
   }
 

@@ -30,7 +30,7 @@ export default function CourseDetailPage() {
   const courseId = params.id as string
   const { user } = useAuth()
   const isExecutor = user?.role === "executor"
-  const isCoach = user?.role === "coach"
+  const isCoach = user?.role === "coach" || (user?.role === "executor" && user?.is_coach)
   const isAdmin = user?.role === "admin"
 
   const [course, setCourse] = useState<Course | null>(null)

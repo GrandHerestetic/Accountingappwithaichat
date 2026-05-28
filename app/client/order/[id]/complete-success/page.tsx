@@ -63,7 +63,7 @@ export default function OrderCompleteSuccessPage({ params }: { params: { id: str
 
               <div className="mt-8 p-4 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  💡 <strong>Совет:</strong> Сохраните контакты исполнителя для будущих проектов. Вы можете найти их в
+                  <strong>Совет:</strong> Сохраните контакты исполнителя для будущих проектов. Вы можете найти их в
                   истории чатов.
                 </p>
               </div>

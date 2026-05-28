@@ -211,7 +211,7 @@ export default function ClientDashboard() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-8 gap-4">
               <div>
                 <h1 className="text-responsive-xl font-bold text-gray-900">
-                  Добро пожаловать, {user?.profile?.profile_name ?? user?.email}! 👋
+                  Добро пожаловать, {user?.profile?.profile_name ?? user?.email}!
                 </h1>
                 <p className="text-sm md:text-base text-gray-600">Управляйте своими заказами и исполнителями</p>
               </div>

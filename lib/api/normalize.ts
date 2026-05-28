@@ -36,12 +36,16 @@ export function normalizeMeResponse(data: MeResponse | Record<string, unknown>):
       is_active: Boolean(root.is_active ?? true),
       created_at: (root.created_at as string) ?? new Date().toISOString(),
       verification_status: (root.verification_status as UserProfile["verification_status"]) ?? undefined,
-    } satisfies MeResponse["user"])
+      is_coach: Boolean(root.is_coach),
+    } satisfies MeResponse["user"] & { is_coach?: boolean })
   const profile = (root.profile ?? {}) as Record<string, unknown>
+  const isCoach = Boolean(root.is_coach ?? nested?.is_coach)
+
   return {
     id: user.id,
     email: user.email,
     role: user.role,
+    is_coach: isCoach,
     is_active: user.is_active,
     created_at: user.created_at,
     verification_status: user.verification_status,

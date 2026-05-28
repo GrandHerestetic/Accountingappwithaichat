@@ -27,6 +27,7 @@ import {
   updateMyResponse,
 } from "@/lib/api"
 import type { OrderResponse, ResponseStatus, PaginatedResponse } from "@/lib/api/types"
+import { getResponseDeadlineLabel } from "@/lib/response-deadline"
 
 // ─── Req 4.8: distinct badge colors per response status ─────────────────────
 const RESPONSE_STATUS_COLORS: Record<ResponseStatus, string> = {
@@ -234,9 +235,7 @@ export default function ExecutorResponsesPage() {
                               <div>
                                 <span className="text-gray-500">Срок выполнения:</span>
                                 <p className="font-medium">
-                                  {response.proposed_deadline
-                                    ? new Date(response.proposed_deadline).toLocaleDateString("ru-RU")
-                                    : "—"}
+                                  {getResponseDeadlineLabel(response) ?? "—"}
                                 </p>
                               </div>
                             </div>
@@ -279,7 +278,7 @@ export default function ExecutorResponsesPage() {
                                 </Button>
                               </>
                             )}
-                            <Link href={`/executor/orders/${response.order_id}/response`}>
+                            <Link href={`/executor/orders/${response.order_id}`}>
                               <Button variant="ghost" className="w-full text-sm">
                                 Просмотр заказа
                               </Button>

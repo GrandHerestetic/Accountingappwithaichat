@@ -12,6 +12,7 @@ import useSWR from "swr"
 import {
   getMe,
   listAdminExecutorLeads,
+  listAdminExecutors,
   listAdminSanctions,
   listCoachCourses,
   listCourses,
@@ -29,6 +30,7 @@ import type {
   CourseAssignment,
   UserProfile,
   PaginatedResponse,
+  AdminExecutorUser,
   ExecutorLeadView,
   Sanction,
 } from "@/lib/api/types"
@@ -187,6 +189,13 @@ export function useUserProfile() {
 export function useCoachCourses(params?: { page?: number; pageSize?: number }) {
   const key = `coach-courses-${params?.page ?? 1}-${params?.pageSize ?? 20}`
   return useSWR<PaginatedResponse<Course>>(key, () => listCoachCourses(params), {
+    revalidateOnFocus: true,
+  })
+}
+
+export function useAdminExecutors(params?: { page?: number; pageSize?: number; q?: string }) {
+  const key = `admin-executors-${params?.page ?? 1}-${params?.q ?? ""}`
+  return useSWR<PaginatedResponse<AdminExecutorUser>>(key, () => listAdminExecutors(params), {
     revalidateOnFocus: true,
   })
 }

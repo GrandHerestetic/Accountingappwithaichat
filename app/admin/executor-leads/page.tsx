@@ -20,8 +20,10 @@ import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAdminExecutorLeads } from "@/hooks/use-swr-hooks"
 import { approveExecutorLead, rejectExecutorLead } from "@/lib/api"
+import { resolveUploadUrl } from "@/lib/upload-url"
 import { toast } from "sonner"
 import type { ExecutorLeadView } from "@/lib/api/types"
+import { ExternalLink, FileText } from "lucide-react"
 
 const STATUS_LABELS: Record<string, string> = {
   new: "Новая",
@@ -47,6 +49,18 @@ function canApprove(lead: ExecutorLeadView) {
 
 function leadName(lead: ExecutorLeadView) {
   return [lead.first_name, lead.last_name].filter(Boolean).join(" ") || lead.email
+}
+
+const DOCUMENT_LABELS: Record<string, string> = {
+  identity: "Удостоверение",
+  education: "Образование",
+  ip_registration: "Регистрация ИП",
+  other: "Документ",
+}
+
+function documentLabel(doc: NonNullable<ExecutorLeadView["documents"]>[number]) {
+  const type = doc.document_type ?? doc.type ?? "other"
+  return DOCUMENT_LABELS[type] ?? doc.original_name ?? type
 }
 
 export default function AdminExecutorLeadsPage() {
@@ -181,23 +195,43 @@ export default function AdminExecutorLeadsPage() {
                         {lead.about && (
                           <p className="text-sm text-gray-700 mt-2 line-clamp-2">{lead.about}</p>
                         )}
-                        {lead.documents && lead.documents.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            {lead.documents.map((doc) =>
-                              doc.url ? (
-                                <a
-                                  key={doc.id}
-                                  href={doc.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs text-blue-600 hover:underline"
-                                >
-                                  {doc.document_type ?? doc.type ?? "документ"}
-                                </a>
-                              ) : null
-                            )}
-                          </div>
-                        )}
+                        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                          <p className="text-xs font-medium text-gray-700 mb-2 flex items-center gap-1">
+                            <FileText className="w-3.5 h-3.5" />
+                            Документы для проверки
+                          </p>
+                          {lead.documents && lead.documents.length > 0 ? (
+                            <ul className="space-y-1.5">
+                              {lead.documents.map((doc) => {
+                                const href = resolveUploadUrl(doc.url)
+                                if (!href) return null
+                                return (
+                                  <li key={doc.id}>
+                                    <a
+                                      href={href}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                                      {documentLabel(doc)}
+                                      {doc.original_name ? (
+                                        <span className="text-gray-500 font-normal">
+                                          ({doc.original_name})
+                                        </span>
+                                      ) : null}
+                                    </a>
+                                  </li>
+                                )
+                              })}
+                            </ul>
+                          ) : (
+                            <p className="text-sm text-amber-700">
+                              Документы не прикреплены или не загрузились — одобрение будет
+                              отклонено API.
+                            </p>
+                          )}
+                        </div>
                       </div>
                       {canApprove(lead) && (
                         <div className="flex flex-col sm:flex-row gap-2">

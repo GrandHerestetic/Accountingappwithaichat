@@ -105,7 +105,18 @@ function LoginPageContent() {
           {...fieldAriaProps(errors.email, emailId)}
         />
       </FormField>
-      <FormField label="Пароль" htmlFor={passwordId} error={errors.password} required>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label htmlFor={passwordId} className="text-sm font-medium">
+            Пароль <span className="text-red-500">*</span>
+          </Label>
+          <Link
+            href="/auth/forgot-password"
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Забыли пароль?
+          </Link>
+        </div>
         <div className="relative">
           <Input
             id={passwordId}
@@ -114,7 +125,8 @@ function LoginPageContent() {
             value={formData.password}
             onChange={(e) => updateField("password", e.target.value)}
             className={fieldInputClass(errors.password)}
-            {...fieldAriaProps(errors.password, passwordId)}
+            aria-invalid={errors.password ? true : undefined}
+            aria-describedby={errors.password ? `${passwordId}-error` : undefined}
           />
           <Button
             type="button"
@@ -126,7 +138,12 @@ function LoginPageContent() {
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
         </div>
-      </FormField>
+        {errors.password && (
+          <p id={`${passwordId}-error`} className="text-sm text-red-600" role="alert">
+            {errors.password}
+          </p>
+        )}
+      </div>
     </>
   )
 
@@ -274,9 +291,6 @@ function LoginPageContent() {
             </div>
 
             <div className="mt-6 text-center space-y-2">
-              {/* <Link href="/auth/forgot-password" className="text-sm text-blue-600 hover:underline">
-                Забыли пароль?
-              </Link> */}
               <div className="text-sm text-gray-600">
                 Нет аккаунта?{" "}
                 <Link href="/client/register" className="text-blue-600 hover:underline">

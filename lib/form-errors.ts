@@ -31,6 +31,15 @@ export function validatePassword(value: string, min = 8): string | undefined {
   return undefined
 }
 
+export function validatePasswordConfirm(
+  password: string,
+  confirm: string,
+): string | undefined {
+  if (!confirm) return "Подтвердите пароль"
+  if (password !== confirm) return "Пароли не совпадают"
+  return undefined
+}
+
 export function validatePhone(value: string): string | undefined {
   const digits = value.replace(/\D/g, "")
   if (!value.trim()) return undefined

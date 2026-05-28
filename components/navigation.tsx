@@ -25,6 +25,7 @@ import {
   BarChart3,
   Users,
 } from "lucide-react"
+import { userIsCoach } from "@/lib/user-roles"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -162,8 +163,8 @@ export function Navigation() {
             active: isActive("/client/dashboard"),
           },
         ]
-      case "executor":
-        return [
+      case "executor": {
+        const executorItems = [
           ...baseItems.filter((item) => item.href !== "/orders"),
           {
             href: "/executor/dashboard",
@@ -190,6 +191,30 @@ export function Navigation() {
             active: pathname.startsWith("/executor/courses"),
           },
         ]
+        if (userIsCoach(user)) {
+          executorItems.push(
+            {
+              href: "/coach/dashboard",
+              label: "Коуч · Dashboard",
+              icon: Star,
+              active: isActive("/coach/dashboard"),
+            },
+            {
+              href: "/coach/courses",
+              label: "Коуч · Курсы",
+              icon: BookOpen,
+              active: isActive("/coach/courses"),
+            },
+            {
+              href: "/coach/students",
+              label: "Коуч · Студенты",
+              icon: Users,
+              active: isActive("/coach/students"),
+            }
+          )
+        }
+        return executorItems
+      }
       case "coach":
         return [
           ...baseItems,
@@ -214,7 +239,6 @@ export function Navigation() {
         ]
       case "admin":
         return [
-          ...baseItems,
           {
             href: "/admin/dashboard",
             label: "Dashboard",
@@ -358,7 +382,7 @@ export function Navigation() {
                       </DropdownMenuItem>
 
                       {/* Специфичные пункты для разных типов пользователей */}
-                      {user?.role === "coach" && (
+                      {userIsCoach(user) && (
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem asChild>
@@ -478,7 +502,7 @@ export function Navigation() {
             })}
 
             {/* Добавляем Аналитику для коуча в мобильное меню */}
-            {isAuthenticated && user?.role === "coach" && (
+            {isAuthenticated && userIsCoach(user) && (
               <Link href="/coach/analytics" onClick={() => setIsMobileMenuOpen(false)}>
                 <Button
                   variant={isActive("/coach/analytics") ? "default" : "ghost"}

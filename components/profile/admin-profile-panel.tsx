@@ -23,6 +23,7 @@ import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/contexts/auth-context"
 import { getProfile, updateProfile, uploadProfileAvatar } from "@/lib/api"
+import { ChangePasswordSection } from "@/components/profile/change-password-section"
 import { FileUploadField } from "@/components/file-upload-field"
 import { FormField, fieldAriaProps, fieldInputClass } from "@/components/form-field"
 import {
@@ -243,6 +244,8 @@ export function AdminProfilePanel() {
                       placeholder="Служебный комментарий, виден только вам"
                     />
                   </FormField>
+
+                  <ChangePasswordSection />
 
                   <Button
                     onClick={() => void handleSave()}

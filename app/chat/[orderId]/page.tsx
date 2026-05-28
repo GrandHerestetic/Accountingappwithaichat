@@ -13,14 +13,16 @@ import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useChat } from "@/hooks/use-chat"
-import { getMyChat, listMyChats, markChatRead } from "@/lib/api"
+import { getMyChat, listMyChats, listMyOrderResponses, markChatRead } from "@/lib/api"
 import type { Chat } from "@/lib/api/types"
 
 export default function OrderChatPage({ params }: { params: { orderId: string } }) {
-  const { user } = useAuth()
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth()
   const [messageInput, setMessageInput] = useState("")
   const [chat, setChat] = useState<Chat | null>(null)
   const [loadingChat, setLoadingChat] = useState(true)
+  const [chatMissing, setChatMissing] = useState(false)
+  const [chatMissingHint, setChatMissingHint] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const [chatId, setChatId] = useState<string | null>(null)
@@ -32,31 +34,85 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
 
   // Fetch chat metadata
   const fetchChat = useCallback(async () => {
+    if (authLoading) return
+    if (!isAuthenticated) {
+      setChat(null)
+      setChatId(null)
+      setChatMissing(true)
+      setChatMissingHint("Нужна авторизация, чтобы открыть чат.")
+      setLoadingChat(false)
+      return
+    }
+
+    setLoadingChat(true)
+    setChatMissing(false)
+    setChatMissingHint(null)
     try {
       const orderOrChatId = params.orderId
-      const data = await listMyChats({ page: 1, pageSize: 100 })
-      const found =
-        data.items.find((c) => c.id === orderOrChatId) ??
-        data.items.find((c) => c.order_id === orderOrChatId)
-      if (found?.id) {
-        setChat(found)
-        setChatId(found.id)
-        return
-      }
-
+      // Fast path when route contains chat id.
       try {
         const detail = await getMyChat(orderOrChatId)
         setChat(detail)
         setChatId(detail.id)
+        setChatMissing(false)
+        return
       } catch {
-        // chat not found for this order/id
+        // continue with order-id search
+      }
+
+      // Route from orders screen uses order id. Search across all pages.
+      const pageSize = 100
+      let page = 1
+      let total = 0
+
+      do {
+        const data = await listMyChats({ page, pageSize })
+        total = data.total ?? 0
+        const found =
+          data.items.find((c) => c.id === orderOrChatId) ??
+          data.items.find((c) => c.order_id === orderOrChatId)
+        if (found?.id) {
+          setChat(found)
+          setChatId(found.id)
+          setChatMissing(false)
+          return
+        }
+        page += 1
+      } while ((page - 1) * pageSize < total)
+
+      setChat(null)
+      setChatId(null)
+      setChatMissing(true)
+      try {
+        const myResponses = await listMyOrderResponses(orderOrChatId)
+        const statuses = new Set((myResponses.items ?? []).map((r) => r.status))
+        if (statuses.has("accepted")) {
+          setChatMissingHint(
+            "Ваш отклик принят, но чат не найден. Обновите страницу и попробуйте снова."
+          )
+        } else if (statuses.has("submitted") || statuses.has("rejected")) {
+          setChatMissingHint(
+            "Вы не участник этого чата: клиент выбрал другого исполнителя."
+          )
+        } else if (myResponses.items?.length) {
+          setChatMissingHint("Чат появится после принятия вашего отклика клиентом.")
+        } else {
+          setChatMissingHint("У вас нет отклика на этот заказ.")
+        }
+      } catch {
+        setChatMissingHint(
+          "Чат по этому заказу пока недоступен. Обычно чат появляется после выбора отклика клиентом."
+        )
       }
     } catch {
-      // ignore
+      setChat(null)
+      setChatId(null)
+      setChatMissing(true)
+      setChatMissingHint("Не удалось загрузить чат. Попробуйте обновить страницу.")
     } finally {
       setLoadingChat(false)
     }
-  }, [params.orderId])
+  }, [params.orderId, authLoading, isAuthenticated])
 
   useEffect(() => {
     fetchChat()
@@ -84,6 +140,9 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
 
   const otherParticipantId = chat?.participant_ids?.find((id) => id !== user?.id)
   const chatTitle = chat ? `Заказ #${chat.order_id}` : `Чат #${chatId}`
+  const orderLinkHref =
+    user?.role === "executor" ? `/executor/orders/${chat?.order_id ?? ""}` : `/orders/${chat?.order_id ?? ""}`
+  const orderLinkLabel = user?.role === "executor" ? "К заказу" : "Перейти к заказу"
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100">
@@ -98,6 +157,15 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
               Назад к чатам
             </Button>
           </Link>
+
+          {chatMissing && !loadingChat && (
+            <Card className="mb-6 border-amber-200 bg-amber-50">
+              <CardContent className="py-4 text-sm text-amber-900">
+                {chatMissingHint ??
+                  "Чат по этому заказу пока недоступен. Обычно чат появляется после выбора отклика клиентом."}
+              </CardContent>
+            </Card>
+          )}
 
           <div className="grid gap-6 lg:grid-cols-4">
             {/* Order Info Sidebar */}
@@ -132,9 +200,9 @@ export default function OrderChatPage({ params }: { params: { orderId: string } 
 
                       <div className="pt-4 border-t space-y-2">
                         {chat?.order_id && (
-                          <Link href={`/orders/${chat.order_id}`}>
+                          <Link href={orderLinkHref}>
                             <Button className="w-full" variant="outline">
-                              Перейти к заказу
+                              {orderLinkLabel}
                             </Button>
                           </Link>
                         )}

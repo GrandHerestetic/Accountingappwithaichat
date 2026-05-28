@@ -38,6 +38,7 @@ export interface User {
   id: string
   email: string
   role: "client" | "executor" | "coach" | "admin"
+  is_coach?: boolean
   is_active: boolean
   created_at: string
   verification_status?: "none" | "pending" | "in_review" | "verified" | "rejected"
@@ -59,6 +60,8 @@ export interface UserProfile {
   id: string
   email: string
   role: "client" | "executor" | "coach" | "admin"
+  /** Executor with admin-granted coach profile (dual role). */
+  is_coach?: boolean
   is_active?: boolean
   created_at?: string
   verification_status?: string
@@ -551,6 +554,35 @@ export interface ExecutorLeadSubmittedResponse {
   lead_id: string
   status: string
   message: string
+}
+
+export interface OrderReport {
+  id: string
+  order_id: string
+  reporter_id: string
+  reporter_email: string
+  reporter_name: string
+  reason: string
+  status: "pending" | "dismissed" | "order_removed"
+  admin_notes?: string
+  order_title: string
+  order_description: string
+  order_budget: number
+  order_currency: string
+  order_status: string
+  created_at: string
+  reviewed_at?: string
+}
+
+export interface AdminExecutorUser {
+  user_id: string
+  email: string
+  display_name: string
+  is_active: boolean
+  is_coach: boolean
+  rating_avg: number
+  rating_count: number
+  created_at: string
 }
 
 export interface ExecutorLeadView {

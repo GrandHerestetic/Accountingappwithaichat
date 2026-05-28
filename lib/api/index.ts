@@ -19,12 +19,14 @@ import type {
   AttachmentView,
   EntityRatingSummary,
   EntityReview,
+  AdminExecutorUser,
   ExecutorLeadSubmittedResponse,
   ExecutorLeadView,
   MeResponse,
   UploadView,
   Notification,
   Order,
+  OrderReport,
   OrderDetailsResponse,
   OrderResponse,
   PaginatedResponse,
@@ -107,6 +109,40 @@ export async function uploadProfileAvatar(file: File): Promise<ProfileResponse> 
 
 export async function clearProfileAvatar(): Promise<ProfileResponse> {
   return apiRequest<ProfileResponse>("/api/v1/profile/avatar", { method: "DELETE" })
+}
+
+export async function changePassword(body: {
+  current_password: string
+  new_password: string
+}): Promise<void> {
+  await apiRequest<{ status: string }>("/api/v1/profile/password", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  })
+}
+
+export type ForgotPasswordResponse = {
+  message: string
+  reset_url?: string
+  email_sent?: boolean
+  mail_configured?: boolean
+}
+
+export async function requestPasswordReset(email: string): Promise<ForgotPasswordResponse> {
+  return apiRequest<ForgotPasswordResponse>("/api/v1/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email: email.trim() }),
+  })
+}
+
+export async function resetPasswordWithToken(body: {
+  token: string
+  new_password: string
+}): Promise<void> {
+  await apiRequest<{ status: string; message: string }>("/api/v1/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
@@ -280,10 +316,26 @@ export async function getMyCourseReview(courseId: string): Promise<MyReview | nu
 
 // ─── Executor responses ───────────────────────────────────────────────────────
 
+const MY_RESPONSES_MAX_PAGE_SIZE = 100
+
 export async function listMyResponses(params?: ListParams): Promise<PaginatedResponse<OrderResponse>> {
+  const pageSize = Math.min(params?.pageSize ?? 20, MY_RESPONSES_MAX_PAGE_SIZE)
   return apiRequest(
-    `/api/v1/my/responses${qs({ page: params?.page ?? 1, page_size: params?.pageSize ?? 20 })}`
+    `/api/v1/my/responses${qs({ page: params?.page ?? 1, page_size: pageSize })}`
   )
+}
+
+/** Fetches all executor responses (backend caps page_size at 100). */
+export async function listAllMyResponses(): Promise<OrderResponse[]> {
+  const pageSize = MY_RESPONSES_MAX_PAGE_SIZE
+  const first = await listMyResponses({ page: 1, pageSize })
+  const items = [...first.items]
+  const totalPages = Math.ceil(first.total / pageSize)
+  for (let page = 2; page <= totalPages; page++) {
+    const next = await listMyResponses({ page, pageSize })
+    items.push(...next.items)
+  }
+  return items
 }
 
 function buildResponsePayload(body: {
@@ -867,6 +919,78 @@ export async function enrollInCourse(courseId: string): Promise<CourseAssignment
 }
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
+
+export async function reportOrderAsExecutor(
+  orderId: string,
+  reason: string
+): Promise<{ id: string; status: string; message: string }> {
+  return apiRequest(`/api/v1/executor/orders/${orderId}/report`, {
+    method: "POST",
+    body: JSON.stringify({ reason: reason.trim() }),
+  })
+}
+
+export async function listAdminOrderReports(
+  params?: ListParams & { status?: string }
+): Promise<PaginatedResponse<OrderReport>> {
+  return apiRequest<PaginatedResponse<OrderReport>>(
+    `/api/v1/admin/order-reports${qs({
+      page: params?.page ?? 1,
+      page_size: params?.pageSize ?? 50,
+      status: params?.status,
+    })}`
+  )
+}
+
+export async function dismissAdminOrderReport(
+  reportId: string,
+  notes?: string
+): Promise<{ id: string; status: string; message: string }> {
+  return apiRequest(`/api/v1/admin/order-reports/${reportId}/dismiss`, {
+    method: "POST",
+    body: JSON.stringify({ notes: notes ?? "" }),
+  })
+}
+
+export async function removeOrderByAdminReport(
+  reportId: string,
+  notes?: string
+): Promise<{ id: string; status: string; message: string }> {
+  return apiRequest(`/api/v1/admin/order-reports/${reportId}/remove-order`, {
+    method: "POST",
+    body: JSON.stringify({ notes: notes ?? "" }),
+  })
+}
+
+export async function listAdminExecutors(
+  params?: ListParams & { q?: string }
+): Promise<PaginatedResponse<AdminExecutorUser>> {
+  return apiRequest<PaginatedResponse<AdminExecutorUser>>(
+    `/api/v1/admin/users/executors${qs({
+      page: params?.page ?? 1,
+      page_size: params?.pageSize ?? 50,
+      q: params?.q,
+    })}`
+  )
+}
+
+export async function promoteExecutorToCoach(userId: string): Promise<{
+  user_id: string
+  role: string
+  is_coach?: boolean
+  message: string
+}> {
+  return apiRequest(`/api/v1/admin/users/${userId}/promote-coach`, { method: "POST" })
+}
+
+export async function revokeExecutorCoach(userId: string): Promise<{
+  user_id: string
+  role: string
+  is_coach?: boolean
+  message: string
+}> {
+  return apiRequest(`/api/v1/admin/users/${userId}/revoke-coach`, { method: "POST" })
+}
 
 export async function listAdminExecutorLeads(
   params?: ListParams & { status?: string }

@@ -378,7 +378,7 @@ export default function PublicOrders() {
           {isAuthenticated && user?.role === "executor" && (
             <Card className="mt-8 bg-green-50 border-green-200">
               <CardContent className="p-6">
-                <h3 className="font-semibold text-green-900 mb-3">💡 Советы для успешных откликов:</h3>
+                <h3 className="font-semibold text-green-900 mb-3">Советы для успешных откликов:</h3>
                 <div className="grid gap-4 md:grid-cols-2 text-sm text-green-800">
                   <div>
                     <h4 className="font-medium mb-2">Качественный отклик:</h4>

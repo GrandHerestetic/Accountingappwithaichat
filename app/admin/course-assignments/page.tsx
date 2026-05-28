@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -14,9 +14,10 @@ import { ProtectedRoute } from "@/components/protected-route"
 import {
   createAdminCourseAssignment,
   listAdminCourseAssignments,
+  listAdminExecutors,
   listCourses,
 } from "@/lib/api"
-import type { Course, CourseAssignment } from "@/lib/api/types"
+import type { AdminExecutorUser, Course, CourseAssignment } from "@/lib/api/types"
 import {
   ASSIGNMENT_SOURCE_LABELS,
   ASSIGNMENT_STATUS_COLORS,
@@ -27,6 +28,7 @@ import { toast } from "sonner"
 
 export default function AdminCourseAssignmentsPage() {
   const [courses, setCourses] = useState<Course[]>([])
+  const [executors, setExecutors] = useState<AdminExecutorUser[]>([])
   const [assignments, setAssignments] = useState<CourseAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -39,11 +41,13 @@ export default function AdminCourseAssignmentsPage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [coursesData, assignmentsData] = await Promise.all([
+      const [coursesData, executorsData, assignmentsData] = await Promise.all([
         listCourses({ page: 1, pageSize: 100, status: "published" }),
+        listAdminExecutors({ page: 1, pageSize: 500 }),
         listAdminCourseAssignments({ page: 1, pageSize: 50 }),
       ])
       setCourses(coursesData.items.filter(isCoursePubliclyAvailable))
+      setExecutors(executorsData.items.filter((e) => e.is_active))
       setAssignments(assignmentsData.items)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Не удалось загрузить данные")
@@ -56,18 +60,21 @@ export default function AdminCourseAssignmentsPage() {
     loadData()
   }, [loadData])
 
-  const executorSuggestions = useMemo(() => {
-    const ids = new Set<string>()
-    for (const item of assignments) {
-      if (item.executor_id) ids.add(item.executor_id)
-    }
-    return Array.from(ids)
-  }, [assignments])
+  const executorLabel = (e: AdminExecutorUser) => {
+    const name = e.display_name?.trim()
+    if (name) return `${name} (${e.email})`
+    return e.email
+  }
+
+  const executorDisplayById = (id: string) => {
+    const e = executors.find((x) => x.user_id === id)
+    return e ? executorLabel(e) : id
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!courseId.trim() || !executorId.trim()) {
-      toast.error("Укажите курс и ID исполнителя")
+      toast.error("Выберите курс и исполнителя")
       return
     }
 
@@ -108,7 +115,7 @@ export default function AdminCourseAssignmentsPage() {
             Назначение курсов
           </h1>
           <p className="text-gray-600 mb-8">
-            Назначайте опубликованные курсы исполнителям по UUID пользователя
+            Назначайте опубликованные курсы исполнителям из списка зарегистрированных в системе
           </p>
 
           <div className="grid lg:grid-cols-2 gap-8">
@@ -138,24 +145,25 @@ export default function AdminCourseAssignmentsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="executor">ID исполнителя (UUID)</Label>
-                    <Input
-                      id="executor"
-                      value={executorId}
-                      onChange={(e) => setExecutorId(e.target.value)}
-                      placeholder="00000000-0000-0000-0000-000000000102"
-                      list="executor-suggestions"
-                    />
-                    {executorSuggestions.length > 0 && (
-                      <datalist id="executor-suggestions">
-                        {executorSuggestions.map((id) => (
-                          <option key={id} value={id} />
-                        ))}
-                      </datalist>
+                    <Label htmlFor="executor">Исполнитель</Label>
+                    {executors.length === 0 ? (
+                      <p className="text-sm text-amber-700">
+                        Нет активных исполнителей. Одобрите заявки в разделе «Заявки исполнителей».
+                      </p>
+                    ) : (
+                      <Select value={executorId} onValueChange={setExecutorId}>
+                        <SelectTrigger id="executor">
+                          <SelectValue placeholder="Выберите исполнителя" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {executors.map((executor) => (
+                            <SelectItem key={executor.user_id} value={executor.user_id}>
+                              {executorLabel(executor)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     )}
-                    <p className="text-xs text-gray-500">
-                      UUID можно взять из Postman, seed-demo или после одобрения заявки исполнителя
-                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -179,7 +187,11 @@ export default function AdminCourseAssignmentsPage() {
                     />
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={submitting || loading}>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={submitting || loading || executors.length === 0}
+                  >
                     {submitting ? (
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
                     ) : (
@@ -215,7 +227,7 @@ export default function AdminCourseAssignmentsPage() {
                           </Badge>
                         </div>
                         <p className="text-sm text-gray-600">
-                          Исполнитель: <code className="text-xs">{item.executor_id}</code>
+                          Исполнитель: {executorDisplayById(item.executor_id)}
                         </p>
                         <p className="text-sm text-gray-500">
                           Источник: {ASSIGNMENT_SOURCE_LABELS[item.source] ?? item.source}

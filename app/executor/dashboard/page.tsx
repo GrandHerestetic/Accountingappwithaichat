@@ -20,6 +20,7 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/contexts/auth-context"
 import { getExecutorRating, listMyResponses } from "@/lib/api"
 import type { OrderResponse } from "@/lib/api/types"
+import { getResponseDeadlineLabel } from "@/lib/response-deadline"
 
 export default function ExecutorDashboard() {
   const { user } = useAuth()
@@ -85,7 +86,7 @@ export default function ExecutorDashboard() {
             {/* Header */}
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Добро пожаловать, {user?.profile?.profile_name ?? user?.email}! 👋</h1>
+                <h1 className="text-3xl font-bold text-gray-900">Добро пожаловать, {user?.profile?.profile_name ?? user?.email}!</h1>
                 <p className="text-gray-600">Управляйте заказами и отслеживайте статистику</p>
               </div>
               <Link href="/executor/orders">
@@ -191,7 +192,7 @@ export default function ExecutorDashboard() {
                                     Чат
                                   </Button>
                                 </Link>
-                                <Link href={`/executor/orders/${response.order_id}/response`}>
+                                <Link href={`/executor/orders/${response.order_id}`}>
                                   <Button variant="outline" size="sm">
                                     <Eye className="w-4 h-4 mr-1" />
                                     Детали
@@ -201,10 +202,7 @@ export default function ExecutorDashboard() {
                             </div>
                             <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
                               <Calendar className="w-4 h-4" />
-                              Срок:{" "}
-                              {response.proposed_deadline
-                                ? new Date(response.proposed_deadline).toLocaleDateString("ru-RU")
-                                : "—"}
+                              Срок: {getResponseDeadlineLabel(response) ?? "—"}
                             </div>
                           </CardContent>
                         </Card>
