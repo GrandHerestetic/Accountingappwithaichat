@@ -23,6 +23,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import {
+  Archive,
   ArrowLeft,
   BookOpen,
   Briefcase,
@@ -237,17 +238,26 @@ function EditCourseContent() {
     }
   }
 
+  const handleArchive = async () => {
+    if (!course) return
+    setDeleting(true)
+    try {
+      await archiveCoachCourse(courseId)
+      toast.success("Курс перемещён в архив и деактивирован")
+      router.push("/coach/courses")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось отправить курс в архив")
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const handleDelete = async () => {
     if (!course) return
     setDeleting(true)
     try {
-      if (course.status === "published") {
-        await archiveCoachCourse(courseId)
-        toast.success("Курс отправлен в архив")
-      } else {
-        await deleteCoachCourse(courseId)
-        toast.success("Курс удалён")
-      }
+      await deleteCoachCourse(courseId)
+      toast.success("Курс удалён")
       router.push("/coach/courses")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Не удалось удалить курс")
@@ -313,35 +323,59 @@ function EditCourseContent() {
             </div>
 
             {!isArchived && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" disabled={deleting}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    {course.status === "published" ? "В архив" : "Удалить"}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      {course.status === "published" ? "Отправить курс в архив?" : "Удалить курс?"}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {course.status === "published"
-                        ? "Курс исчезнет из каталога, но данные сохранятся в архиве."
-                        : "Черновик будет удалён без возможности восстановления."}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Отмена</AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-red-600 hover:bg-red-700"
-                      onClick={() => void handleDelete()}
-                    >
-                      {course.status === "published" ? "В архив" : "Удалить"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <div className="flex flex-wrap gap-2">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" disabled={deleting}>
+                      <Archive className="w-4 h-4 mr-2" />
+                      В архив
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Переместить курс в архив?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Курс станет неактивным и исчезнет из каталога для исполнителей. Вы сможете
+                        найти его во вкладке «Архив».
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Отмена</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => void handleArchive()}>
+                        В архив
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                {course.status === "draft" && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" disabled={deleting}>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Удалить
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Удалить курс?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Черновик будет удалён без возможности восстановления.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Отмена</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-red-600 hover:bg-red-700"
+                          onClick={() => void handleDelete()}
+                        >
+                          Удалить
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
             )}
           </div>
 

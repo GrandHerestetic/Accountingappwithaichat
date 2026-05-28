@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BookOpen, Plus, Search, Eye, Loader2, Pencil, Trash2 } from "lucide-react"
+import { BookOpen, Plus, Search, Eye, Loader2, Pencil, Trash2, Archive } from "lucide-react"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
@@ -52,26 +52,33 @@ export default function CoachCoursesPage() {
     )
   }
 
-  const handleRemoveCourse = async (course: (typeof courses)[number]) => {
-    const isPublished = course.status === "published"
+  const handleArchiveCourse = async (course: (typeof courses)[number]) => {
     const confirmed = confirm(
-      isPublished
-        ? `Отправить курс «${course.title}» в архив?`
-        : `Удалить курс «${course.title}»? Это действие нельзя отменить.`
+      `Переместить курс «${course.title}» в архив? Он станет неактивным и исчезнет из каталога.`
     )
     if (!confirmed) return
 
     try {
-      if (isPublished) {
-        await archiveCoachCourse(course.id)
-        toast.success("Курс отправлен в архив")
-      } else {
-        await deleteCoachCourse(course.id)
-        toast.success("Курс удалён")
-      }
+      await archiveCoachCourse(course.id)
+      toast.success("Курс перемещён в архив и деактивирован")
       await mutate()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Не удалось выполнить действие")
+      toast.error(err instanceof Error ? err.message : "Не удалось отправить курс в архив")
+    }
+  }
+
+  const handleDeleteCourse = async (course: (typeof courses)[number]) => {
+    const confirmed = confirm(
+      `Удалить курс «${course.title}» без возможности восстановления?`
+    )
+    if (!confirmed) return
+
+    try {
+      await deleteCoachCourse(course.id)
+      toast.success("Курс удалён")
+      await mutate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось удалить курс")
     }
   }
 
@@ -219,21 +226,34 @@ export default function CoachCoursesPage() {
                                     Редактировать
                                   </Button>
                                 </Link>
-                                <Link href={`/courses/${course.id}`}>
-                                  <Button size="sm" variant="outline" className="w-full">
-                                    <Eye className="w-4 h-4 mr-1" />
-                                    Просмотр
-                                  </Button>
-                                </Link>
+                                {course.status !== "draft" && (
+                                  <Link href={`/courses/${course.id}`}>
+                                    <Button size="sm" variant="outline" className="w-full">
+                                      <Eye className="w-4 h-4 mr-1" />
+                                      Просмотр
+                                    </Button>
+                                  </Link>
+                                )}
                                 {course.status !== "archived" && (
                                   <Button
                                     size="sm"
                                     variant="outline"
+                                    className="w-full"
+                                    onClick={() => void handleArchiveCourse(course)}
+                                  >
+                                    <Archive className="w-4 h-4 mr-1" />
+                                    В архив
+                                  </Button>
+                                )}
+                                {course.status === "draft" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
                                     className="w-full text-red-600 hover:text-red-700"
-                                    onClick={() => void handleRemoveCourse(course)}
+                                    onClick={() => void handleDeleteCourse(course)}
                                   >
                                     <Trash2 className="w-4 h-4 mr-1" />
-                                    {course.status === "published" ? "В архив" : "Удалить"}
+                                    Удалить
                                   </Button>
                                 )}
                               </div>

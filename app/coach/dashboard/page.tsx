@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BookOpen, Archive, TrendingUp, Award, Plus, Eye, FileText, BarChart3 } from "lucide-react"
+import { BookOpen, Archive, TrendingUp, Award, Plus, Eye, FileText, BarChart3, Pencil } from "lucide-react"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
@@ -205,12 +205,21 @@ export default function CoachDashboard() {
                                     {new Date(course.lastUpdated).toLocaleDateString("ru-RU")}
                                   </p>
                                 </div>
-                                <Link href={`/courses/${course.id}`}>
-                                  <Button size="sm" variant="outline">
-                                    <Eye className="w-4 h-4 mr-1" />
-                                    Открыть
-                                  </Button>
-                                </Link>
+                                {course.status === "draft" ? (
+                                  <Link href={`/coach/courses/${course.id}/edit`}>
+                                    <Button size="sm" variant="outline">
+                                      <Pencil className="w-4 h-4 mr-1" />
+                                      Редактировать
+                                    </Button>
+                                  </Link>
+                                ) : (
+                                  <Link href={`/courses/${course.id}`}>
+                                    <Button size="sm" variant="outline">
+                                      <Eye className="w-4 h-4 mr-1" />
+                                      Открыть
+                                    </Button>
+                                  </Link>
+                                )}
                               </div>
                             ))}
                           {courses.length === 0 && !isLoading && (
@@ -246,12 +255,21 @@ export default function CoachDashboard() {
                                 Обновлён {new Date(course.lastUpdated).toLocaleDateString("ru-RU")}
                               </p>
                             </div>
-                            <Link href={`/courses/${course.id}`}>
-                              <Button size="sm" variant="outline">
-                                <Eye className="w-4 h-4 mr-1" />
-                                Просмотр
-                              </Button>
-                            </Link>
+                            {course.status === "draft" ? (
+                              <Link href={`/coach/courses/${course.id}/edit`}>
+                                <Button size="sm" variant="outline">
+                                  <Pencil className="w-4 h-4 mr-1" />
+                                  Редактировать
+                                </Button>
+                              </Link>
+                            ) : (
+                              <Link href={`/courses/${course.id}`}>
+                                <Button size="sm" variant="outline">
+                                  <Eye className="w-4 h-4 mr-1" />
+                                  Просмотр
+                                </Button>
+                              </Link>
+                            )}
                           </div>
                         </CardContent>
                       </Card>

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BookOpen, Loader2, ArrowLeft, Star } from "lucide-react"
-import { getCourseDetail, getEntityRating, listMyCourseAssignments } from "@/lib/api"
+import { getCoachCourseDetail, getCourseDetail, getEntityRating, listMyCourseAssignments } from "@/lib/api"
 import type { Course, CourseAssignment, CourseMaterial, EntityRatingSummary } from "@/lib/api/types"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -30,23 +30,39 @@ export default function CourseDetailPage() {
   const courseId = params.id as string
   const { user } = useAuth()
   const isExecutor = user?.role === "executor"
+  const isCoach = user?.role === "coach"
   const isAdmin = user?.role === "admin"
 
   const [course, setCourse] = useState<Course | null>(null)
   const [materials, setMaterials] = useState<CourseMaterial[]>([])
   const [assignment, setAssignment] = useState<CourseAssignment | null>(null)
   const [courseRating, setCourseRating] = useState<EntityRatingSummary | null>(null)
+  const [isOwnCoachCourse, setIsOwnCoachCourse] = useState(false)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("overview")
 
   const canReview = isExecutor && assignment?.status === "completed"
+  const canViewMaterialsDirectly = isAdmin || (isCoach && isOwnCoachCourse) || Boolean(assignment)
 
   useEffect(() => {
     const fetchCourse = async () => {
       setLoading(true)
       try {
-        const [detail, assignmentsData, ratingData] = await Promise.all([
-          getCourseDetail(courseId),
+        let detail
+        if (isCoach) {
+          try {
+            detail = await getCoachCourseDetail(courseId)
+            setIsOwnCoachCourse(true)
+          } catch {
+            detail = await getCourseDetail(courseId)
+            setIsOwnCoachCourse(false)
+          }
+        } else {
+          detail = await getCourseDetail(courseId)
+          setIsOwnCoachCourse(false)
+        }
+
+        const [assignmentsData, ratingData] = await Promise.all([
           isExecutor
             ? listMyCourseAssignments({ page: 1, pageSize: 100 })
             : Promise.resolve({ items: [] as CourseAssignment[], total: 0, page: 1, page_size: 0 }),
@@ -59,7 +75,7 @@ export default function CourseDetailPage() {
           (item) => item.course_id === courseId && isEnrolledInCourse(item)
         )
         setAssignment(active ?? null)
-        if ((isAdmin || active) && detail.materials?.length) {
+        if ((isAdmin || isCoach || active) && detail.materials?.length) {
           setActiveTab("materials")
         }
       } catch (err) {
@@ -70,7 +86,7 @@ export default function CourseDetailPage() {
       }
     }
     fetchCourse()
-  }, [courseId, isExecutor, isAdmin])
+  }, [courseId, isExecutor, isCoach, isAdmin])
 
   useEffect(() => {
     if (searchParams.get("tab") === "review" && canReview) {
@@ -129,11 +145,25 @@ export default function CourseDetailPage() {
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
         <div className="container mx-auto px-4 py-12">
           <Link
-            href={isExecutor ? "/executor/courses" : isAdmin ? "/admin/courses" : "/courses"}
+            href={
+              isExecutor
+                ? "/executor/courses"
+                : isCoach
+                  ? "/coach/courses"
+                  : isAdmin
+                    ? "/admin/courses"
+                    : "/courses"
+            }
             className="inline-flex items-center gap-2 text-blue-200 hover:text-white mb-6 text-sm"
           >
             <ArrowLeft className="h-4 w-4" />
-            {isExecutor ? "Назад к моим курсам" : isAdmin ? "Назад к модерации" : "Назад к курсам"}
+            {isExecutor
+              ? "Назад к моим курсам"
+              : isCoach
+                ? "Назад к моим курсам"
+                : isAdmin
+                  ? "Назад к модерации"
+                  : "Назад к курсам"}
           </Link>
 
           <div className="space-y-4 max-w-3xl">
@@ -222,7 +252,7 @@ export default function CourseDetailPage() {
                   <p className="text-gray-600">Материалы курса пока недоступны</p>
                 </CardContent>
               </Card>
-            ) : !assignment && !isAdmin ? (
+            ) : !canViewMaterialsDirectly ? (
               <Card>
                 <CardContent className="py-12 text-center space-y-4">
                   <p className="text-gray-600">
@@ -249,7 +279,13 @@ export default function CourseDetailPage() {
             ) : (
               <CourseMaterialsView
                 materials={materials}
-                hint="Просмотр материалов для модерации — запись на курс не требуется"
+                hint={
+                  isAdmin
+                    ? "Просмотр материалов для модерации — запись на курс не требуется"
+                    : isCoach
+                      ? "Просмотр материалов вашего курса"
+                      : undefined
+                }
               />
             )}
           </TabsContent>
