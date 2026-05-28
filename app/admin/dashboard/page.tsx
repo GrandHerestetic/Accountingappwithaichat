@@ -8,7 +8,13 @@ import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/contexts/auth-context"
-import { listAdminCourseAssignments, listAdminCourses, listAdminSanctions, listOrders } from "@/lib/api"
+import {
+  listAdminCourseAssignments,
+  listAdminCourses,
+  listAdminExecutorLeads,
+  listAdminSanctions,
+  listOrders,
+} from "@/lib/api"
 
 export default function AdminDashboard() {
   const { user } = useAuth()
@@ -18,6 +24,7 @@ export default function AdminDashboard() {
     courseAssignments: 0,
     activeSanctions: 0,
     pendingCourses: 0,
+    pendingExecutorLeads: 0,
   })
 
   useEffect(() => {
@@ -26,13 +33,15 @@ export default function AdminDashboard() {
       listAdminCourseAssignments({ page: 1, pageSize: 1 }),
       listAdminSanctions({ page: 1, pageSize: 50 }),
       listAdminCourses({ page: 1, pageSize: 1, moderationStatus: "in_review" }),
+      listAdminExecutorLeads({ page: 1, pageSize: 1, status: "new" }),
     ])
-      .then(([orders, assignments, sanctions, pendingCourses]) => {
+      .then(([orders, assignments, sanctions, pendingCourses, newLeads]) => {
         setStats({
           orders: orders.total,
           courseAssignments: assignments.total,
           activeSanctions: sanctions.items.filter((s) => s.status === "active").length,
           pendingCourses: pendingCourses.total,
+          pendingExecutorLeads: newLeads.total,
         })
       })
       .finally(() => setLoading(false))
@@ -80,10 +89,16 @@ export default function AdminDashboard() {
                   <CardTitle>Быстрые действия</CardTitle>
                 </CardHeader>
                 <CardContent className="grid sm:grid-cols-2 gap-3">
+                  <Link href="/admin/executor-leads">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Shield className="w-4 h-4 mr-2" />
+                      Заявки исполнителей ({stats.pendingExecutorLeads})
+                    </Button>
+                  </Link>
                   <Link href="/admin/moderation">
                     <Button variant="outline" className="w-full justify-start">
                       <Shield className="w-4 h-4 mr-2" />
-                      Модерация ({stats.pendingLeads})
+                      Санкции
                     </Button>
                   </Link>
                   <Link href="/admin/disputes">

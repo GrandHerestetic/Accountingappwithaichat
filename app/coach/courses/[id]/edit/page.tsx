@@ -36,7 +36,9 @@ import {
   Video,
   X,
 } from "lucide-react"
+import { VideoEmbed } from "@/components/courses/video-embed"
 import { ProtectedRoute } from "@/components/protected-route"
+import { normalizeVideoMaterialUrl } from "@/lib/video-embed-url"
 import { toast } from "sonner"
 import {
   archiveCoachCourse,
@@ -201,7 +203,12 @@ function EditCourseContent() {
         ...(material.type === "text"
           ? { content: material.content.trim() }
           : material.url.trim()
-            ? { url: material.url.trim() }
+            ? {
+                url:
+                  material.type === "video"
+                    ? normalizeVideoMaterialUrl(material.url)
+                    : material.url.trim(),
+              }
             : {}),
       }
 
@@ -541,13 +548,22 @@ function EditCourseContent() {
                             </div>
                           ) : (
                             <div className="space-y-2">
-                              <Label>URL *</Label>
+                              <Label>
+                                {material.type === "video" ? "Ссылка на YouTube *" : "URL *"}
+                              </Label>
                               <Input
-                                placeholder="https://..."
+                                placeholder={
+                                  material.type === "video"
+                                    ? "https://www.youtube.com/watch?v=..."
+                                    : "https://..."
+                                }
                                 value={material.url}
                                 onChange={(e) => updateMaterial(material.key, { url: e.target.value })}
                                 disabled={isArchived}
                               />
+                              {material.type === "video" && material.url.trim() && !isArchived && (
+                                <VideoEmbed url={material.url} title={material.title || "Превью"} />
+                              )}
                             </div>
                           )}
                         </CardContent>

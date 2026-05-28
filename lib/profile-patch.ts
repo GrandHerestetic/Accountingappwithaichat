@@ -10,6 +10,7 @@ export type ProfilePatchInput = {
   bio?: string
   company_name?: string
   contact_name?: string
+  contact_position?: string
   website?: string
   /** Город (исполнитель) или алиас для address (клиент). */
   city?: string
@@ -19,7 +20,7 @@ export type ProfilePatchInput = {
   expertise?: string
   experience_level?: string
   specializations?: string[]
-  /** Строка «Налоги, 1С» — разбивается в specializations. */
+  /** Строка «Налоги, 1С» — разбивается в specializations / expertise / contact_position. */
   specializations_text?: string
 }
 
@@ -66,17 +67,31 @@ export function serializeProfilePatch(
     }
   }
 
-  const experience =
-    input.experience_level?.trim() || input.expertise?.trim()
-  if (experience) {
-    if (role === "coach") {
-      body.expertise = experience
-    } else if (role === "executor" || !role) {
-      body.experience_level = experience
+  if (role === "coach") {
+    const expertise =
+      input.expertise?.trim() ||
+      (input.specializations_text !== undefined
+        ? input.specializations_text.trim()
+        : "")
+    if (expertise) {
+      body.expertise = expertise
+    } else if (input.specializations_text !== undefined) {
+      const specs = parseSpecializations(input)
+      if (specs?.length) body.expertise = specs.join(", ")
     }
-  }
-
-  if (role === "executor") {
+  } else if (role === "client") {
+    const position =
+      input.contact_position?.trim() ||
+      (input.specializations_text !== undefined
+        ? input.specializations_text.trim().split(/[,;]+/)[0]?.trim() ?? ""
+        : "")
+    if (position) {
+      body.contact_position = position
+    }
+  } else if (role === "executor") {
+    if (input.experience_level?.trim()) {
+      body.experience_level = input.experience_level.trim()
+    }
     if (input.specializations_text !== undefined) {
       body.specializations = parseSpecializations(input) ?? []
     } else {

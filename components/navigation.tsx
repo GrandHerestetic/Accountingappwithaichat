@@ -82,6 +82,8 @@ export function Navigation() {
     if (path === "/admin/analytics" && pathname === "/admin/analytics") return true
     if (path === "/admin/course-assignments" && pathname === "/admin/course-assignments") return true
     if (path === "/admin/courses" && pathname.startsWith("/admin/courses")) return true
+    if (path === "/admin/executor-leads" && pathname.startsWith("/admin/executor-leads"))
+      return true
 
     return false
   }
@@ -242,6 +244,12 @@ export function Navigation() {
             label: "Модерация курсов",
             icon: BookOpen,
             active: isActive("/admin/courses"),
+          },
+          {
+            href: "/admin/executor-leads",
+            label: "Заявки исполнителей",
+            icon: UserPlus,
+            active: isActive("/admin/executor-leads"),
           },
         ]
       default:

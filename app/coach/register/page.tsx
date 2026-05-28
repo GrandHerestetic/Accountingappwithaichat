@@ -76,7 +76,6 @@ export default function CoachRegister() {
         phone: formData.personalInfo.phone || undefined,
         first_name: formData.personalInfo.firstName || undefined,
         last_name: formData.personalInfo.lastName || undefined,
-        experience_level: formData.personalInfo.experience || undefined,
         specializations: formData.personalInfo.specialization
           ? [formData.personalInfo.specialization]
           : undefined,

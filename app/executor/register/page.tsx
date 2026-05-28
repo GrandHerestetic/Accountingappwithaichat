@@ -155,7 +155,9 @@ export default function ExecutorRegister() {
 
       const result = await submitExecutorLead(fd)
       toast.success(result.message || "Заявка отправлена на проверку")
-      router.push("/auth/login")
+      router.push(
+        `/executor/register/success?email=${encodeURIComponent(p.email.trim())}`
+      )
     } catch (error) {
       console.error("Registration error:", error)
       toast.error(error instanceof Error ? error.message : "Ошибка регистрации")

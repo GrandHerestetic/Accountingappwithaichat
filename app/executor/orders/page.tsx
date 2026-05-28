@@ -15,12 +15,25 @@ import {
   Clock,
 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import useSWR from "swr"
 import { Navigation } from "@/components/navigation"
+import { listMyResponses } from "@/lib/api"
 import { useOrders } from "@/hooks/use-swr-hooks"
 import { useAuth } from "@/contexts/auth-context"
-import type { Order } from "@/lib/api/types"
+import type { Order, ResponseStatus } from "@/lib/api/types"
+
+/** Заказы, где уже есть отклик (кроме отменённого — можно откликнуться снова). */
+const ACTIVE_RESPONSE_STATUSES: ResponseStatus[] = [
+  "draft",
+  "payment_pending",
+  "submitted",
+  "accepted",
+  "rejected",
+]
 
 export default function ExecutorOrders() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("")
   const [selectedLocation, setSelectedLocation] = useState("")
@@ -33,7 +46,21 @@ export default function ExecutorOrders() {
     q: searchQuery || undefined,
     category: selectedCategory && selectedCategory !== "Все категории" ? selectedCategory : undefined,
   })
+  const { data: myResponsesData } = useSWR(
+    user?.role === "executor" ? ["my-responses", "job-search"] : null,
+    () => listMyResponses({ page: 1, pageSize: 200 })
+  )
   const orders: Order[] = data?.items ?? []
+
+  const respondedOrderIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const r of myResponsesData?.items ?? []) {
+      if (ACTIVE_RESPONSE_STATUSES.includes(r.status)) {
+        ids.add(r.order_id)
+      }
+    }
+    return ids
+  }, [myResponsesData])
 
   const categories = [
     "Все категории",
@@ -49,6 +76,7 @@ export default function ExecutorOrders() {
 
   const filteredOrders = useMemo(() => {
     return [...orders]
+      .filter((order) => !respondedOrderIds.has(order.id))
       .filter((order) => {
         if (!selectedLocation || selectedLocation === "Все города") return true
         return order.description?.toLowerCase().includes(selectedLocation.toLowerCase())
@@ -64,11 +92,10 @@ export default function ExecutorOrders() {
             return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         }
       })
-  }, [orders, selectedLocation, sortBy])
+  }, [orders, respondedOrderIds, selectedLocation, sortBy])
 
   const handleResponseClick = (orderId: string) => {
-    // Перенаправляем на страницу отклика
-    window.location.href = `/executor/orders/${orderId}/response`
+    router.push(`/executor/orders/${orderId}/response`)
   }
 
   return (

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { CheckCircle, Download, ExternalLink, Loader2, Play } from "lucide-react"
+import { VideoEmbed } from "@/components/courses/video-embed"
 import { markCourseMaterialCompleted } from "@/lib/api"
 import type { CourseAssignment, CourseMaterial } from "@/lib/api/types"
 import { isMaterialCompleted } from "@/lib/course-utils"
@@ -55,14 +56,7 @@ export function CourseMaterialsProgress({
     switch (material.type) {
       case "video":
         return material.url ? (
-          <div className="aspect-video rounded-lg overflow-hidden bg-black mt-3">
-            <iframe
-              src={material.url}
-              title={material.title}
-              className="w-full h-full"
-              allowFullScreen
-            />
-          </div>
+          <VideoEmbed url={material.url} title={material.title} />
         ) : null
       case "pdf":
         return material.url ? (

@@ -12,12 +12,14 @@ import { BookOpen, FileText, LinkIcon, Plus, Save, ArrowLeft, Briefcase, Video, 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { VideoEmbed } from "@/components/courses/video-embed"
 import {
   createCoachCourse,
   createCoachCourseMaterial,
   publishCoachCourse,
   uploadFile,
 } from "@/lib/api"
+import { normalizeVideoMaterialUrl } from "@/lib/video-embed-url"
 
 type MaterialDraft = {
   id: number
@@ -113,7 +115,12 @@ export default function CreateCoursePage() {
         position: i + 1,
         ...(material.type === "text"
           ? { content: material.content.trim() }
-          : { url: material.url.trim() }),
+          : {
+              url:
+                material.type === "video"
+                  ? normalizeVideoMaterialUrl(material.url)
+                  : material.url.trim(),
+            }),
       })
     }
   }
@@ -351,12 +358,21 @@ export default function CreateCoursePage() {
                             </div>
                           ) : (
                             <div className="space-y-2">
-                              <Label>URL *</Label>
+                              <Label>
+                                {material.type === "video" ? "Ссылка на YouTube *" : "URL *"}
+                              </Label>
                               <Input
-                                placeholder="https://..."
+                                placeholder={
+                                  material.type === "video"
+                                    ? "https://www.youtube.com/watch?v=..."
+                                    : "https://..."
+                                }
                                 value={material.url}
                                 onChange={(e) => updateMaterial(material.id, { url: e.target.value })}
                               />
+                              {material.type === "video" && material.url.trim() && (
+                                <VideoEmbed url={material.url} title={material.title || "Превью"} />
+                              )}
                             </div>
                           )}
                         </CardContent>

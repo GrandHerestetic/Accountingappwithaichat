@@ -558,15 +558,26 @@ export interface ExecutorLeadView {
   email: string
   first_name?: string
   last_name?: string
+  middle_name?: string
   city?: string
   about?: string
   education?: string
   experience_level?: string
+  specializations?: string[]
+  work_format?: string
   hourly_rate?: number
   iin?: string
+  phone?: string
   status?: string
+  submitted_at?: string
   created_at: string
-  documents?: { id: string; type: string; url?: string }[]
+  documents?: {
+    id: string
+    type?: string
+    document_type?: string
+    url?: string
+    original_name?: string
+  }[]
 }
 
 // Error types

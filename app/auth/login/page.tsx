@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Eye, EyeOff, Briefcase, BookOpen, Settings } from "lucide-react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Eye, EyeOff, Briefcase, BookOpen, Settings, Clock } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { FormField, fieldAriaProps, fieldInputClass } from "@/components/form-field"
 import {
   clearFieldError,
@@ -19,11 +20,12 @@ import {
   validateEmail,
   validatePassword,
 } from "@/lib/form-errors"
+import { ApiError } from "@/lib/api/types"
 import { toast } from "sonner"
 
 type LoginField = "email" | "password"
 
-export default function LoginPage() {
+function LoginPageContent() {
   const [showPassword, setShowPassword] = useState(false)
   const [activeTab, setActiveTab] = useState("client")
   const [isLoading, setIsLoading] = useState(false)
@@ -35,6 +37,14 @@ export default function LoginPage() {
   })
   const { login } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const executorPending = searchParams.get("executor_pending") === "1"
+
+  useEffect(() => {
+    if (executorPending) {
+      setActiveTab("executor")
+    }
+  }, [executorPending])
 
   const updateField = (field: LoginField, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -65,7 +75,16 @@ export default function LoginPage() {
       router.push(redirectPath)
     } catch (error) {
       console.error("Login error:", error)
-      const message = error instanceof Error ? error.message : "Ошибка входа. Попробуйте еще раз."
+      let message =
+        error instanceof Error ? error.message : "Ошибка входа. Попробуйте еще раз."
+      if (
+        userType === "executor" &&
+        error instanceof ApiError &&
+        error.status === 401
+      ) {
+        message =
+          "Не удалось войти. Если вы только что зарегистрировались как исполнитель, дождитесь одобрения заявки администратором — аккаунт создаётся после проверки."
+      }
       setErrors({ email: message })
       toast.error(message)
     } finally {
@@ -159,6 +178,16 @@ export default function LoginPage() {
             <CardDescription>Выберите тип аккаунта и войдите</CardDescription>
           </CardHeader>
           <CardContent>
+            {executorPending && (
+              <Alert className="mb-6 border-amber-200 bg-amber-50">
+                <Clock className="h-4 w-4 text-amber-700" />
+                <AlertTitle className="text-amber-900">Заявка на проверке</AlertTitle>
+                <AlertDescription className="text-amber-800">
+                  После регистрации исполнителя вход недоступен, пока администратор не одобрит
+                  заявку. Используйте тот же email и пароль, когда получите подтверждение.
+                </AlertDescription>
+              </Alert>
+            )}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="client">Заказчик</TabsTrigger>
@@ -276,5 +305,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-gray-600">
+          Загрузка…
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   )
 }

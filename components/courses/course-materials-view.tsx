@@ -1,6 +1,7 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
+import { VideoEmbed } from "@/components/courses/video-embed"
 import { Download, ExternalLink } from "lucide-react"
 import type { CourseMaterial } from "@/lib/api/types"
 
@@ -8,14 +9,7 @@ function renderMaterialBody(material: CourseMaterial) {
   switch (material.type) {
     case "video":
       return material.url ? (
-        <div className="aspect-video rounded-lg overflow-hidden bg-black mt-3">
-          <iframe
-            src={material.url}
-            title={material.title}
-            className="w-full h-full"
-            allowFullScreen
-          />
-        </div>
+        <VideoEmbed url={material.url} title={material.title} />
       ) : null
     case "pdf":
       return material.url ? (
